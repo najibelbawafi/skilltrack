@@ -46,14 +46,17 @@ function isValidImageDataUrl(value: string) {
   return /^data:image\/(jpeg|png|webp);base64,/i.test(value);
 }
 
+// Validasi menggunakan kalender lokal, tanpa konversi UTC.
 function isValidDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
 
-  const date = new Date(`${value}T00:00:00`);
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
 
   return (
-    !Number.isNaN(date.getTime()) &&
-    date.toISOString().slice(0, 10) === value
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
   );
 }
 
@@ -145,7 +148,9 @@ function AchievementManager({ userId }: { userId: string }) {
     const cleanDescription = description.trim();
 
     if (!cleanTitle || !cleanOrganizer || !date || !category) {
-      setMessage("Nama pencapaian, kategori, penyelenggara, dan tanggal wajib diisi.");
+      setMessage(
+        "Nama pencapaian, kategori, penyelenggara, dan tanggal wajib diisi."
+      );
       return;
     }
 
@@ -437,6 +442,7 @@ function AchievementManager({ userId }: { userId: string }) {
                   placeholder="Jelaskan pencapaian atau pengalaman yang diperoleh..."
                   className={inputClass}
                 />
+
                 <p className="mt-2 text-right text-xs text-gray-400">
                   {description.length}/1500 karakter
                 </p>
@@ -487,7 +493,10 @@ function AchievementManager({ userId }: { userId: string }) {
               </div>
 
               {message && (
-                <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                <p
+                  role="alert"
+                  className="rounded-lg bg-red-50 p-3 text-sm text-red-700"
+                >
                   {message}
                 </p>
               )}
