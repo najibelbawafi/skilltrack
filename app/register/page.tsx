@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { registerUser } from "@/lib/auth";
@@ -16,7 +17,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleRegister(e: React.FormEvent<HTMLFormElement>) {
+  async function handleRegister(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
 
@@ -53,6 +54,9 @@ export default function RegisterPage() {
     }
   }
 
+  const inputClass =
+    "w-full rounded-lg border border-gray-300 bg-white px-4 py-3 !text-[#25364A] placeholder:!text-gray-400 outline-none transition focus:border-[#0756A5] focus:ring-2 focus:ring-[#0756A5]/10";
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-4 py-10">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
@@ -63,6 +67,7 @@ export default function RegisterPage() {
         <h1 className="mt-8 text-2xl font-bold text-[#25364A]">
           Buat Akun
         </h1>
+
         <p className="mt-2 text-sm text-gray-500">
           Daftar untuk mulai membangun portofolio digitalmu.
         </p>
@@ -73,10 +78,12 @@ export default function RegisterPage() {
               Nama Lengkap
             </label>
             <input
+              type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#0756A5]"
+              className={inputClass}
               placeholder="Masukkan nama lengkap"
+              autoComplete="name"
             />
           </div>
 
@@ -88,8 +95,9 @@ export default function RegisterPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#0756A5]"
+              className={inputClass}
               placeholder="nama@email.com"
+              autoComplete="email"
             />
           </div>
 
@@ -101,8 +109,9 @@ export default function RegisterPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#0756A5]"
+              className={inputClass}
               placeholder="Minimal 8 karakter"
+              autoComplete="new-password"
             />
           </div>
 
@@ -114,8 +123,9 @@ export default function RegisterPage() {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#0756A5]"
+              className={inputClass}
               placeholder="Ulangi password"
+              autoComplete="new-password"
             />
           </div>
 
