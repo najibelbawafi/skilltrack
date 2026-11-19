@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -16,6 +16,8 @@ import {
   MapPin,
   Globe,
   LockKeyhole,
+  Palette,
+  Check,
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
@@ -28,6 +30,198 @@ import {
   getPublicationSettings,
   savePublicationSettings,
 } from "@/lib/publication";
+
+type PortfolioTheme =
+  | "formal"
+  | "modern"
+  | "minimal"
+  | "executive"
+  | "creative"
+  | "technical"
+  | "two-column"
+  | "monochrome";
+
+const portfolioThemes: {
+  id: PortfolioTheme;
+  name: string;
+  description: string;
+  color: string;
+}[] = [
+  {
+    id: "formal",
+    name: "Formal",
+    description: "Profesional dan klasik",
+    color: "#0756A5",
+  },
+  {
+    id: "modern",
+    name: "Modern",
+    description: "Bersih dan kontemporer",
+    color: "#0F766E",
+  },
+  {
+    id: "minimal",
+    name: "Minimal",
+    description: "Sederhana dan lapang",
+    color: "#64748B",
+  },
+  {
+    id: "executive",
+    name: "Executive",
+    description: "Elegan dan tegas",
+    color: "#1E293B",
+  },
+  {
+    id: "creative",
+    name: "Creative",
+    description: "Dinamis dan ekspresif",
+    color: "#0D9488",
+  },
+  {
+    id: "technical",
+    name: "Technical",
+    description: "Nuansa teknologi",
+    color: "#0369A1",
+  },
+  {
+    id: "two-column",
+    name: "Two Column",
+    description: "Tampilan dua kolom",
+    color: "#2563EB",
+  },
+  {
+    id: "monochrome",
+    name: "Monochrome",
+    description: "Hitam dan putih",
+    color: "#18181B",
+  },
+];
+
+const themeStyles: Record<
+  PortfolioTheme,
+  {
+    page: string;
+    sheet: string;
+    hero: string;
+    heroText: string;
+    secondaryText: string;
+    accent: string;
+    badge: string;
+    sectionTitle: string;
+    card: string;
+    soft: string;
+    divider: string;
+  }
+> = {
+  formal: {
+    page: "bg-[#F4F7FB]",
+    sheet: "rounded-2xl border border-gray-200 bg-white shadow-sm",
+    hero: "bg-[#0756A5]",
+    heroText: "text-white",
+    secondaryText: "text-blue-100",
+    accent: "text-[#0756A5]",
+    badge: "bg-blue-50 text-[#0756A5]",
+    sectionTitle: "text-[#25364A]",
+    card: "rounded-xl border border-gray-200 bg-white",
+    soft: "bg-[#F4F7FB]",
+    divider: "border-gray-200",
+  },
+  modern: {
+    page: "bg-[#ECFDF5]",
+    sheet: "rounded-3xl border border-emerald-100 bg-white shadow-md",
+    hero: "bg-gradient-to-r from-[#0F766E] to-[#115E59]",
+    heroText: "text-white",
+    secondaryText: "text-emerald-100",
+    accent: "text-[#0F766E]",
+    badge: "bg-emerald-50 text-emerald-800",
+    sectionTitle: "text-[#134E4A]",
+    card: "rounded-2xl border border-emerald-100 bg-white",
+    soft: "bg-emerald-50",
+    divider: "border-emerald-100",
+  },
+  minimal: {
+    page: "bg-[#F8FAFC]",
+    sheet: "rounded-lg border border-slate-200 bg-white shadow-none",
+    hero: "bg-[#E2E8F0]",
+    heroText: "text-slate-900",
+    secondaryText: "text-slate-600",
+    accent: "text-slate-700",
+    badge: "bg-slate-100 text-slate-700",
+    sectionTitle: "text-slate-900",
+    card: "rounded-lg border border-slate-200 bg-white",
+    soft: "bg-slate-50",
+    divider: "border-slate-200",
+  },
+  executive: {
+    page: "bg-[#E2E8F0]",
+    sheet: "rounded-xl border border-slate-300 bg-white shadow-lg",
+    hero: "bg-[#1E293B]",
+    heroText: "text-white",
+    secondaryText: "text-slate-300",
+    accent: "text-[#334155]",
+    badge: "bg-slate-100 text-slate-800",
+    sectionTitle: "text-[#1E293B]",
+    card: "rounded-lg border border-slate-200 bg-white",
+    soft: "bg-slate-100",
+    divider: "border-slate-300",
+  },
+  creative: {
+    page: "bg-[#F0FDFA]",
+    sheet: "rounded-3xl border border-teal-100 bg-white shadow-md",
+    hero: "bg-gradient-to-br from-[#0D9488] to-[#0369A1]",
+    heroText: "text-white",
+    secondaryText: "text-teal-100",
+    accent: "text-[#0F766E]",
+    badge: "bg-teal-50 text-teal-800",
+    sectionTitle: "text-[#134E4A]",
+    card: "rounded-2xl border border-teal-100 bg-white",
+    soft: "bg-teal-50",
+    divider: "border-teal-100",
+  },
+  technical: {
+    page: "bg-[#EFF6FF]",
+    sheet: "rounded-xl border border-blue-200 bg-white shadow-sm",
+    hero: "bg-[#0C4A6E]",
+    heroText: "text-white",
+    secondaryText: "text-sky-200",
+    accent: "text-[#0369A1]",
+    badge: "bg-sky-50 text-sky-800",
+    sectionTitle: "text-[#0C4A6E]",
+    card: "rounded-lg border border-blue-200 bg-white",
+    soft: "bg-sky-50",
+    divider: "border-blue-200",
+  },
+  "two-column": {
+    page: "bg-[#F1F5F9]",
+    sheet: "rounded-2xl border border-slate-200 bg-white shadow-sm",
+    hero: "bg-[#1D4ED8]",
+    heroText: "text-white",
+    secondaryText: "text-blue-100",
+    accent: "text-[#1D4ED8]",
+    badge: "bg-blue-50 text-blue-800",
+    sectionTitle: "text-[#1E3A8A]",
+    card: "rounded-xl border border-slate-200 bg-white",
+    soft: "bg-blue-50",
+    divider: "border-slate-200",
+  },
+  monochrome: {
+    page: "bg-[#E5E5E5]",
+    sheet: "rounded-none border border-neutral-300 bg-white shadow-none",
+    hero: "bg-[#18181B]",
+    heroText: "text-white",
+    secondaryText: "text-neutral-300",
+    accent: "text-neutral-800",
+    badge: "bg-neutral-100 text-neutral-800",
+    sectionTitle: "text-neutral-900",
+    card: "rounded-none border border-neutral-300 bg-white",
+    soft: "bg-neutral-100",
+    divider: "border-neutral-300",
+  },
+};
+
+function isPortfolioTheme(value: string | null): value is PortfolioTheme {
+  return portfolioThemes.some((theme) => theme.id === value);
+}
 
 function subscribeToAuth(callback: () => void) {
   window.addEventListener("storage", callback);
@@ -54,7 +248,6 @@ function subscribeToPublication(callback: () => void) {
 
 function getPublicationSnapshot(userId: string | null | undefined) {
   if (!userId) return false;
-
   return getPublicationSettings(userId).isPublic;
 }
 
@@ -103,6 +296,11 @@ export default function PortfolioPage() {
     () => false
   );
 
+  const [selectedTheme, setSelectedTheme] =
+    useState<PortfolioTheme>("formal");
+
+  const [themeLoaded, setThemeLoaded] = useState(false);
+
   const user = userId ? getCurrentUser() : null;
   const profile = userId ? getStudentProfile(userId) : null;
   const projects = userId ? getStudentProjects(userId) : [];
@@ -115,6 +313,33 @@ export default function PortfolioPage() {
     }
   }, [userId, user, router]);
 
+  useEffect(() => {
+    if (!userId) return;
+
+    const savedTheme = localStorage.getItem(
+      `skilltrack_portfolio_theme_${userId}`
+    );
+
+    if (isPortfolioTheme(savedTheme)) {
+      setSelectedTheme(savedTheme);
+    } else {
+      setSelectedTheme("formal");
+    }
+
+    setThemeLoaded(true);
+  }, [userId]);
+
+  function handleThemeChange(theme: PortfolioTheme) {
+    if (!userId) return;
+
+    setSelectedTheme(theme);
+
+    localStorage.setItem(
+      `skilltrack_portfolio_theme_${userId}`,
+      theme
+    );
+  }
+
   function handlePublicationToggle() {
     if (!userId) return;
 
@@ -122,7 +347,7 @@ export default function PortfolioPage() {
     window.dispatchEvent(new Event("skilltrack-publication"));
   }
 
-  if (userId === undefined || userId === null || !user) {
+  if (userId === undefined || userId === null || !user || !themeLoaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
         <p className="text-sm text-gray-500">
@@ -134,18 +359,70 @@ export default function PortfolioPage() {
 
   const fullName = profile?.fullName || user.name;
   const initial = fullName.charAt(0).toUpperCase();
+  const style = themeStyles[selectedTheme];
 
   return (
     <>
       <PageHeader />
 
-      <main className="min-h-screen bg-[#F4F7FB] px-4 py-8 md:px-8">
+      <main className={`min-h-screen px-4 py-8 md:px-8 ${style.page}`}>
         <div className="mx-auto max-w-5xl">
           <div className="mb-6 flex justify-end">
-            <span className="rounded-full bg-blue-100 px-4 py-2 text-xs font-semibold text-[#0756A5]">
+            <span className={`rounded-full px-4 py-2 text-xs font-semibold ${style.badge}`}>
               PREVIEW PORTOFOLIO
             </span>
           </div>
+
+          <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+            <div className="mb-5 flex items-center gap-2">
+              <Palette size={20} className="text-[#0756A5]" />
+              <h2 className="font-bold text-[#25364A]">
+                Pilih Tema Portofolio
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {portfolioThemes.map((theme) => {
+                const active = selectedTheme === theme.id;
+
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => handleThemeChange(theme.id)}
+                    aria-pressed={active}
+                    className={`rounded-xl border p-3 text-left transition ${
+                      active
+                        ? "border-[#0756A5] bg-blue-50 ring-2 ring-blue-100"
+                        : "border-gray-200 bg-white hover:border-blue-300"
+                    }`}
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <span
+                        className="h-7 w-7 rounded-lg border border-black/10"
+                        style={{ backgroundColor: theme.color }}
+                      />
+                      {active && (
+                        <Check size={18} className="text-[#0756A5]" />
+                      )}
+                    </div>
+
+                    <p className="text-sm font-semibold text-[#25364A]">
+                      {theme.name}
+                    </p>
+
+                    <p className="mt-1 text-xs text-gray-500">
+                      {theme.description}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className="mt-4 text-xs text-gray-500">
+              Tema yang dipilih akan tersimpan otomatis pada akun ini.
+            </p>
+          </section>
 
           <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
@@ -199,9 +476,9 @@ export default function PortfolioPage() {
             </p>
           </section>
 
-          <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <div className="bg-[#0756A5] px-6 py-10 text-white md:px-10">
-              <p className="text-sm font-medium tracking-wider text-blue-100">
+          <section className={`overflow-hidden ${style.sheet}`}>
+            <div className={`px-6 py-10 md:px-10 ${style.hero}`}>
+              <p className={`text-sm font-medium tracking-wider ${style.secondaryText}`}>
                 STUDENT DIGITAL PORTFOLIO
               </p>
 
@@ -213,21 +490,21 @@ export default function PortfolioPage() {
                     className="h-28 w-28 rounded-full border-4 border-white/80 object-cover"
                   />
                 ) : (
-                  <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-white/80 bg-white text-4xl font-bold text-[#0756A5]">
+                  <div className={`flex h-28 w-28 items-center justify-center rounded-full border-4 border-white/80 bg-white text-4xl font-bold ${style.accent}`}>
                     {initial}
                   </div>
                 )}
 
                 <div>
-                  <h1 className="text-3xl font-bold md:text-4xl">
+                  <h1 className={`text-3xl font-bold md:text-4xl ${style.heroText}`}>
                     {fullName}
                   </h1>
 
-                  <p className="mt-2 text-blue-100">
+                  <p className={`mt-2 ${style.secondaryText}`}>
                     {profile?.major || "Jurusan belum diisi"}
                   </p>
 
-                  <p className="mt-1 text-sm text-blue-100">
+                  <p className={`mt-1 text-sm ${style.secondaryText}`}>
                     {profile?.school || "Nama sekolah belum diisi"}
                   </p>
                 </div>
@@ -237,8 +514,8 @@ export default function PortfolioPage() {
             <div className="grid gap-8 p-6 md:grid-cols-[1fr_2fr] md:p-10">
               <aside className="space-y-7">
                 <section>
-                  <h2 className="flex items-center gap-2 font-bold text-[#25364A]">
-                    <User size={19} className="text-[#0756A5]" />
+                  <h2 className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}>
+                    <User size={19} className={style.accent} />
                     Tentang Saya
                   </h2>
 
@@ -248,26 +525,26 @@ export default function PortfolioPage() {
                 </section>
 
                 <section>
-                  <h2 className="font-bold text-[#25364A]">
+                  <h2 className={`font-bold ${style.sectionTitle}`}>
                     Informasi Kontak
                   </h2>
 
                   <div className="mt-4 space-y-3 text-sm text-gray-600">
                     <p className="flex items-start gap-2 break-all">
-                      <Mail size={17} className="mt-0.5 shrink-0 text-[#0756A5]" />
+                      <Mail size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
                       {profile?.email || user.email}
                     </p>
 
                     {profile?.phone && (
                       <p className="flex items-start gap-2">
-                        <Phone size={17} className="mt-0.5 shrink-0 text-[#0756A5]" />
+                        <Phone size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
                         {profile.phone}
                       </p>
                     )}
 
                     {profile?.address && (
                       <p className="flex items-start gap-2">
-                        <MapPin size={17} className="mt-0.5 shrink-0 text-[#0756A5]" />
+                        <MapPin size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
                         {profile.address}
                       </p>
                     )}
@@ -275,13 +552,13 @@ export default function PortfolioPage() {
                 </section>
 
                 <section>
-                  <h2 className="flex items-center gap-2 font-bold text-[#25364A]">
-                    <GraduationCap size={19} className="text-[#0756A5]" />
+                  <h2 className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}>
+                    <GraduationCap size={19} className={style.accent} />
                     Pendidikan
                   </h2>
 
-                  <div className="mt-3 rounded-xl bg-[#F4F7FB] p-4">
-                    <p className="font-semibold text-[#25364A]">
+                  <div className={`mt-3 p-4 ${style.soft} ${style.card}`}>
+                    <p className={`font-semibold ${style.sectionTitle}`}>
                       {profile?.school || "Sekolah belum diisi"}
                     </p>
 
@@ -298,17 +575,17 @@ export default function PortfolioPage() {
 
               <div className="space-y-8">
                 <section>
-                  <h2 className="flex items-center gap-2 text-lg font-bold text-[#25364A]">
-                    <FolderKanban size={20} className="text-[#0756A5]" />
+                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
+                    <FolderKanban size={20} className={style.accent} />
                     Proyek Saya
-                    <span className="ml-auto rounded-full bg-blue-50 px-3 py-1 text-xs text-[#0756A5]">
+                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
                       {projects.length} proyek
                     </span>
                   </h2>
 
                   <div className="mt-4 space-y-3">
                     {projects.length === 0 ? (
-                      <p className="rounded-xl bg-[#F4F7FB] p-4 text-sm text-gray-500">
+                      <p className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}>
                         Belum ada proyek yang ditambahkan.
                       </p>
                     ) : (
@@ -316,16 +593,13 @@ export default function PortfolioPage() {
                         const safeUrl = getSafeExternalUrl(project.link);
 
                         return (
-                          <article
-                            key={project.id}
-                            className="rounded-xl border border-gray-200 p-4"
-                          >
+                          <article key={project.id} className={`p-4 ${style.card}`}>
                             <div className="flex flex-wrap items-start justify-between gap-2">
-                              <h3 className="font-semibold text-[#25364A]">
+                              <h3 className={`font-semibold ${style.sectionTitle}`}>
                                 {project.title}
                               </h3>
 
-                              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs text-[#0756A5]">
+                              <span className={`rounded-full px-3 py-1 text-xs ${style.badge}`}>
                                 {project.category}
                               </span>
                             </div>
@@ -350,7 +624,7 @@ export default function PortfolioPage() {
                                   href={safeUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[#0756A5] hover:underline"
+                                  className={`mt-3 inline-flex items-center gap-2 text-sm font-medium hover:underline ${style.accent}`}
                                 >
                                   Lihat proyek
                                   <ExternalLink size={14} />
@@ -369,17 +643,17 @@ export default function PortfolioPage() {
                 </section>
 
                 <section>
-                  <h2 className="flex items-center gap-2 text-lg font-bold text-[#25364A]">
-                    <Award size={20} className="text-[#0756A5]" />
+                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
+                    <Award size={20} className={style.accent} />
                     Sertifikat
-                    <span className="ml-auto rounded-full bg-blue-50 px-3 py-1 text-xs text-[#0756A5]">
+                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
                       {certificates.length} sertifikat
                     </span>
                   </h2>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {certificates.length === 0 ? (
-                      <p className="rounded-xl bg-[#F4F7FB] p-4 text-sm text-gray-500 sm:col-span-2">
+                      <p className={`p-4 text-sm text-gray-500 sm:col-span-2 ${style.soft} ${style.card}`}>
                         Belum ada sertifikat yang ditambahkan.
                       </p>
                     ) : (
@@ -391,7 +665,7 @@ export default function PortfolioPage() {
                         return (
                           <article
                             key={certificate.id}
-                            className="overflow-hidden rounded-xl border border-gray-200"
+                            className={`overflow-hidden ${style.card}`}
                           >
                             {certificate.imageDataUrl && (
                               <img
@@ -402,7 +676,7 @@ export default function PortfolioPage() {
                             )}
 
                             <div className="p-4">
-                              <h3 className="font-semibold text-[#25364A]">
+                              <h3 className={`font-semibold ${style.sectionTitle}`}>
                                 {certificate.title}
                               </h3>
 
@@ -421,7 +695,7 @@ export default function PortfolioPage() {
                                     href={safeUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[#0756A5] hover:underline"
+                                    className={`mt-3 inline-flex items-center gap-2 text-sm font-medium hover:underline ${style.accent}`}
                                   >
                                     Lihat bukti
                                     <ExternalLink size={14} />
@@ -441,24 +715,24 @@ export default function PortfolioPage() {
                 </section>
 
                 <section>
-                  <h2 className="flex items-center gap-2 text-lg font-bold text-[#25364A]">
-                    <Trophy size={20} className="text-[#0756A5]" />
+                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
+                    <Trophy size={20} className={style.accent} />
                     Pencapaian
-                    <span className="ml-auto rounded-full bg-blue-50 px-3 py-1 text-xs text-[#0756A5]">
+                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
                       {achievements.length} pencapaian
                     </span>
                   </h2>
 
                   <div className="mt-4 space-y-3">
                     {achievements.length === 0 ? (
-                      <p className="rounded-xl bg-[#F4F7FB] p-4 text-sm text-gray-500">
+                      <p className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}>
                         Belum ada pencapaian yang ditambahkan.
                       </p>
                     ) : (
                       achievements.map((achievement) => (
                         <article
                           key={achievement.id}
-                          className="overflow-hidden rounded-xl border border-gray-200 sm:flex"
+                          className={`overflow-hidden sm:flex ${style.card}`}
                         >
                           {achievement.imageDataUrl && (
                             <img
@@ -470,7 +744,7 @@ export default function PortfolioPage() {
 
                           <div className="flex-1 p-4">
                             <div className="flex flex-wrap items-start justify-between gap-2">
-                              <h3 className="font-semibold text-[#25364A]">
+                              <h3 className={`font-semibold ${style.sectionTitle}`}>
                                 {achievement.title}
                               </h3>
 

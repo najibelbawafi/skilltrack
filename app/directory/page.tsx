@@ -9,6 +9,7 @@ import {
   GraduationCap,
   ArrowRight,
   UserRound,
+  FileText,
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
@@ -65,6 +66,7 @@ export default function DirectoryPage() {
 
     return (
       student.name.toLowerCase().includes(keyword) ||
+      (student.profile?.fullName ?? "").toLowerCase().includes(keyword) ||
       (student.profile?.major ?? "").toLowerCase().includes(keyword) ||
       (student.profile?.school ?? "").toLowerCase().includes(keyword)
     );
@@ -97,7 +99,9 @@ export default function DirectoryPage() {
             </div>
 
             <div>
-              <p className="text-sm text-gray-500">Siswa terpublikasi</p>
+              <p className="text-sm text-gray-500">
+                Siswa terpublikasi
+              </p>
               <p className="text-2xl font-bold text-[#25364A]">
                 {publicStudents.length}
               </p>
@@ -180,13 +184,23 @@ export default function DirectoryPage() {
                       </div>
                     </div>
 
-                    <Link
-                      href={`/directory/${student.id}`}
-                      className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#0756A5] px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
-                    >
-                      Lihat Profil
-                      <ArrowRight size={17} />
-                    </Link>
+                    <div className="mt-6 grid grid-cols-2 gap-3">
+                      <Link
+                        href={`/directory/${student.id}`}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0756A5] px-3 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-800"
+                      >
+                        Lihat Portofolio
+                        <ArrowRight size={16} />
+                      </Link>
+
+                      <Link
+                        href={`/directory/${student.id}/cv`}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#0756A5] px-3 py-3 text-center text-sm font-semibold text-[#0756A5] transition hover:bg-blue-50"
+                      >
+                        <FileText size={16} />
+                        Lihat CV
+                      </Link>
+                    </div>
                   </div>
                 </article>
               );
@@ -194,7 +208,10 @@ export default function DirectoryPage() {
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center">
-            <Users className="mx-auto mb-4 text-gray-400" size={40} />
+            <Users
+              className="mx-auto mb-4 text-gray-400"
+              size={40}
+            />
 
             <h2 className="text-lg font-semibold text-[#25364A]">
               {search

@@ -16,6 +16,7 @@ import {
   Eye,
   Users,
   X,
+  FileText,
 } from "lucide-react";
 
 import { getCurrentUser, logoutUser } from "@/lib/auth";
@@ -78,7 +79,13 @@ export default function DashboardPage() {
     { label: "Proyek Saya", icon: FolderKanban, href: "/projects" },
     { label: "Sertifikat", icon: Award, href: "/certificates" },
     { label: "Pencapaian", icon: Trophy, href: "/achievements" },
+    { label: "CV Saya", icon: FileText, href: "/dashboard/cv" },
     { label: "Preview Portofolio", icon: Eye, href: "/portfolio" },
+    {
+      label: "Preview CV",
+      icon: FileText,
+      href: `/directory/${userId}/cv`,
+    },
     { label: "Direktori Siswa", icon: Users, href: "/directory" },
     { label: "Pengaturan", icon: Settings, href: "/settings" },
   ];
@@ -108,7 +115,6 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#F4F7FB] md:flex">
-      {/* Sidebar Desktop */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-gray-200 bg-white p-6 md:flex">
         <Link href="/" className="text-2xl font-bold text-[#0756A5]">
           SkillTrack
@@ -149,9 +155,7 @@ export default function DashboardPage() {
         </button>
       </aside>
 
-      {/* Konten Utama */}
       <section className="min-w-0 flex-1">
-        {/* Header */}
         <header className="relative flex min-h-[72px] items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-4 sm:px-6 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -185,7 +189,6 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {/* Navigasi Mobile */}
         {mobileMenuOpen && (
           <div className="border-b border-gray-200 bg-white p-4 shadow-sm md:hidden">
             <p className="mb-3 px-4 text-xs font-semibold tracking-wide text-gray-400">
@@ -225,9 +228,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Isi Dashboard */}
         <div className="space-y-6 p-4 sm:p-6 md:space-y-8 md:p-8">
-          {/* Welcome */}
           <div className="rounded-2xl bg-[#0756A5] p-5 text-white sm:p-7 md:p-9">
             <p className="text-xs font-semibold tracking-wide text-blue-100 sm:text-sm">
               STUDENT DASHBOARD
@@ -243,7 +244,6 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Ringkasan */}
           <section>
             <h2 className="text-lg font-bold text-[#25364A]">
               Ringkasan Portofolio
@@ -260,10 +260,7 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm text-gray-500">{item.label}</p>
-                      <Icon
-                        size={20}
-                        className="shrink-0 text-[#0756A5]"
-                      />
+                      <Icon size={20} className="shrink-0 text-[#0756A5]" />
                     </div>
 
                     <p className="mt-4 break-words text-xl font-bold text-[#25364A]">
@@ -275,7 +272,6 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* Kelola Portofolio */}
           <section className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
             <h2 className="font-bold text-[#25364A]">
               Kelola Portofolio
@@ -317,7 +313,6 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* Preview Portofolio */}
           <section className="rounded-xl border border-blue-200 bg-white p-5 sm:p-6">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div className="min-w-0">
@@ -342,7 +337,30 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* Direktori Siswa */}
+          <section className="rounded-xl border border-blue-200 bg-white p-5 sm:p-6">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              <div className="min-w-0">
+                <h2 className="flex items-center gap-2 font-bold text-[#25364A]">
+                  <FileText size={20} className="shrink-0 text-[#0756A5]" />
+                  Preview CV
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-gray-500">
+                  Lihat CV digital berdasarkan informasi profil,
+                  keterampilan, proyek, dan pencapaianmu.
+                </p>
+              </div>
+
+              <Link
+                href={`/directory/${userId}/cv`}
+                className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 sm:w-auto"
+              >
+                Lihat CV
+                <FileText size={17} className="ml-2" />
+              </Link>
+            </div>
+          </section>
+
           <section className="rounded-xl border border-green-200 bg-white p-5 sm:p-6">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div className="min-w-0">

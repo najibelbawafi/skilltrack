@@ -13,6 +13,7 @@ import {
   UserRound,
   CalendarDays,
   FolderOpen,
+  FileText,
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
@@ -152,6 +153,14 @@ function StudentDetailContent() {
                 <p className="mt-1 text-sm text-gray-500">
                   {profile?.school || "Sekolah belum diisi"}
                 </p>
+
+                <Link
+                  href={`/directory/${studentId}/cv`}
+                  className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
+                >
+                  <FileText size={17} />
+                  Lihat CV
+                </Link>
               </div>
 
               <div className="flex flex-wrap gap-3 text-sm text-gray-600">
