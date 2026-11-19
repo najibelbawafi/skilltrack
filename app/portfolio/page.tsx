@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import {
   User,
   GraduationCap,
@@ -294,6 +295,12 @@ function formatDate(value: string) {
   });
 }
 
+const sectionAnimation = {
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.4, ease: "easeOut" as const },
+};
+
 export default function PortfolioPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -304,7 +311,6 @@ export default function PortfolioPage() {
     useState<PortfolioTheme>("formal");
 
   const [themeLoaded, setThemeLoaded] = useState(false);
-
   const [profile, setProfile] =
     useState<PortfolioProfile | null>(null);
 
@@ -352,10 +358,9 @@ export default function PortfolioPage() {
     if (!userId || !user) return;
 
     let mounted = true;
-
     const currentUser = user;
 
-async function loadPortfolioData() {
+    async function loadPortfolioData() {
       setDataLoaded(false);
       setDataError("");
 
@@ -464,9 +469,7 @@ async function loadPortfolioData() {
           );
         }
       } finally {
-        if (mounted) {
-          setDataLoaded(true);
-        }
+        if (mounted) setDataLoaded(true);
       }
     }
 
@@ -502,14 +505,10 @@ async function loadPortfolioData() {
         );
 
         if (mounted) {
-          setPublicationError(
-            "Pengaturan publikasi gagal dimuat."
-          );
+          setPublicationError("Pengaturan publikasi gagal dimuat.");
         }
       } finally {
-        if (mounted) {
-          setPublicationLoaded(true);
-        }
+        if (mounted) setPublicationLoaded(true);
       }
     }
 
@@ -525,10 +524,14 @@ async function loadPortfolioData() {
 
     setSelectedTheme(theme);
 
-    localStorage.setItem(
-      `skilltrack_portfolio_theme_${userId}`,
-      theme
-    );
+    try {
+      localStorage.setItem(
+        `skilltrack_portfolio_theme_${userId}`,
+        theme
+      );
+    } catch (error) {
+      console.error("Gagal menyimpan tema:", error);
+    }
   }
 
   async function handlePublicationToggle() {
@@ -548,9 +551,7 @@ async function loadPortfolioData() {
             is_public: nextValue,
             updated_at: new Date().toISOString(),
           },
-          {
-            onConflict: "user_id",
-          }
+          { onConflict: "user_id" }
         );
 
       if (error) throw error;
@@ -579,9 +580,10 @@ async function loadPortfolioData() {
   ) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <p className="text-sm text-gray-500">
+        <div className="flex items-center gap-3 text-sm text-slate-500">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-[#0756A5]" />
           Memuat portofolio...
-        </p>
+        </div>
       </main>
     );
   }
@@ -589,17 +591,15 @@ async function loadPortfolioData() {
   if (dataError) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-4">
-        <div className="max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
+        <div className="glass-card max-w-md p-6 text-center">
           <p className="font-semibold text-red-700">
             Gagal memuat portofolio
           </p>
-          <p className="mt-2 text-sm text-gray-600">
-            {dataError}
-          </p>
+          <p className="mt-2 text-sm text-gray-600">{dataError}</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-5 rounded-xl bg-[#0756A5] px-5 py-2.5 text-sm font-semibold text-white"
+            className="glass-button mt-5 rounded-xl bg-[#0756A5] px-5 py-2.5 text-sm font-semibold text-white"
           >
             Muat Ulang
           </button>
@@ -617,16 +617,22 @@ async function loadPortfolioData() {
       <PageHeader />
 
       <main className={`min-h-screen px-4 py-8 md:px-8 ${style.page}`}>
-        <div className="mx-auto max-w-5xl">
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45 }}
+          className="mx-auto max-w-5xl"
+        >
           <div className="mb-6 flex justify-end">
-            <span
-              className={`rounded-full px-4 py-2 text-xs font-semibold ${style.badge}`}
-            >
+            <span className={`rounded-full px-4 py-2 text-xs font-semibold ${style.badge}`}>
               PREVIEW PORTOFOLIO
             </span>
           </div>
 
-          <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+          <motion.section
+            {...sectionAnimation}
+            className="glass-card mb-6 p-5 md:p-6"
+          >
             <div className="mb-5 flex items-center gap-2">
               <Palette size={20} className="text-[#0756A5]" />
               <h2 className="font-bold text-[#25364A]">
@@ -639,15 +645,17 @@ async function loadPortfolioData() {
                 const active = selectedTheme === theme.id;
 
                 return (
-                  <button
+                  <motion.button
                     key={theme.id}
                     type="button"
                     onClick={() => handleThemeChange(theme.id)}
                     aria-pressed={active}
-                    className={`rounded-xl border p-3 text-left transition ${
+                    whileHover={{ y: -3 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`rounded-xl border p-3 text-left transition-all duration-200 ${
                       active
-                        ? "border-[#0756A5] bg-blue-50 ring-2 ring-blue-100"
-                        : "border-gray-200 bg-white hover:border-blue-300"
+                        ? "border-[#0756A5] bg-blue-50/90 ring-2 ring-blue-100"
+                        : "border-white/80 bg-white/65 hover:border-blue-300 hover:bg-white"
                     }`}
                   >
                     <div className="mb-3 flex items-center justify-between">
@@ -663,11 +671,10 @@ async function loadPortfolioData() {
                     <p className="text-sm font-semibold text-[#25364A]">
                       {theme.name}
                     </p>
-
                     <p className="mt-1 text-xs text-gray-500">
                       {theme.description}
                     </p>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
@@ -675,9 +682,13 @@ async function loadPortfolioData() {
             <p className="mt-4 text-xs text-gray-500">
               Tema yang dipilih akan tersimpan otomatis pada akun ini.
             </p>
-          </section>
+          </motion.section>
 
-          <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+          <motion.section
+            {...sectionAnimation}
+            transition={{ ...sectionAnimation.transition, delay: 0.08 }}
+            className="glass-card mb-6 p-5 md:p-6"
+          >
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
               <div>
                 <div className="flex items-center gap-2">
@@ -709,13 +720,15 @@ async function loadPortfolioData() {
                 </span>
               </div>
 
-              <button
+              <motion.button
                 type="button"
                 onClick={handlePublicationToggle}
                 disabled={publicationSaving}
-                className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                className={`glass-button rounded-xl px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
                   isPublic
-                    ? "bg-gray-600 hover:bg-gray-700"
+                    ? "bg-slate-600 hover:bg-slate-700"
                     : "bg-[#0756A5] hover:bg-blue-800"
                 }`}
               >
@@ -724,7 +737,7 @@ async function loadPortfolioData() {
                   : isPublic
                     ? "Jadikan Privat"
                     : "Publikasikan Portofolio"}
-              </button>
+              </motion.button>
             </div>
 
             {publicationError && (
@@ -733,18 +746,21 @@ async function loadPortfolioData() {
               </p>
             )}
 
-            <p className="mt-4 border-t border-gray-100 pt-4 text-xs leading-5 text-gray-500">
+            <p className="mt-4 border-t border-gray-100/80 pt-4 text-xs leading-5 text-gray-500">
               Status publikasi tersimpan di Supabase. Informasi kontak
               pribadi hanya ditampilkan pada preview pemilik akun,
               bukan pada halaman publik Direktori Siswa.
             </p>
-          </section>
+          </motion.section>
 
-          <section className={`overflow-hidden ${style.sheet}`}>
+          {/* Dokumen portofolio tetap menggunakan latar putih solid */}
+          <motion.section
+            {...sectionAnimation}
+            transition={{ ...sectionAnimation.transition, delay: 0.12 }}
+            className={`overflow-hidden ${style.sheet}`}
+          >
             <div className={`px-6 py-10 md:px-10 ${style.hero}`}>
-              <p
-                className={`text-sm font-medium tracking-wider ${style.secondaryText}`}
-              >
+              <p className={`text-sm font-medium tracking-wider ${style.secondaryText}`}>
                 STUDENT DIGITAL PORTFOLIO
               </p>
 
@@ -764,16 +780,12 @@ async function loadPortfolioData() {
                 )}
 
                 <div>
-                  <h1
-                    className={`text-3xl font-bold md:text-4xl ${style.heroText}`}
-                  >
+                  <h1 className={`text-3xl font-bold md:text-4xl ${style.heroText}`}>
                     {fullName}
                   </h1>
-
                   <p className={`mt-2 ${style.secondaryText}`}>
                     {profile?.major || "Jurusan belum diisi"}
                   </p>
-
                   <p className={`mt-1 text-sm ${style.secondaryText}`}>
                     {profile?.school || "Nama sekolah belum diisi"}
                   </p>
@@ -784,13 +796,10 @@ async function loadPortfolioData() {
             <div className="grid gap-8 p-6 md:grid-cols-[1fr_2fr] md:p-10">
               <aside className="space-y-7">
                 <section>
-                  <h2
-                    className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}
-                  >
+                  <h2 className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}>
                     <User size={19} className={style.accent} />
                     Tentang Saya
                   </h2>
-
                   <p className="mt-3 whitespace-pre-line text-sm leading-7 text-gray-600">
                     {profile?.bio || "Belum ada deskripsi diri."}
                   </p>
@@ -800,32 +809,22 @@ async function loadPortfolioData() {
                   <h2 className={`font-bold ${style.sectionTitle}`}>
                     Informasi Kontak
                   </h2>
-
                   <div className="mt-4 space-y-3 text-sm text-gray-600">
                     <p className="flex items-start gap-2 break-all">
-                      <Mail
-                        size={17}
-                        className={`mt-0.5 shrink-0 ${style.accent}`}
-                      />
+                      <Mail size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
                       {profile?.email || user.email}
                     </p>
 
                     {profile?.phone && (
                       <p className="flex items-start gap-2">
-                        <Phone
-                          size={17}
-                          className={`mt-0.5 shrink-0 ${style.accent}`}
-                        />
+                        <Phone size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
                         {profile.phone}
                       </p>
                     )}
 
                     {profile?.address && (
                       <p className="flex items-start gap-2">
-                        <MapPin
-                          size={17}
-                          className={`mt-0.5 shrink-0 ${style.accent}`}
-                        />
+                        <MapPin size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
                         {profile.address}
                       </p>
                     )}
@@ -833,9 +832,7 @@ async function loadPortfolioData() {
                 </section>
 
                 <section>
-                  <h2
-                    className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}
-                  >
+                  <h2 className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}>
                     <GraduationCap size={19} className={style.accent} />
                     Pendidikan
                   </h2>
@@ -844,14 +841,11 @@ async function loadPortfolioData() {
                     <p className={`font-semibold ${style.sectionTitle}`}>
                       {profile?.school || "Sekolah belum diisi"}
                     </p>
-
                     <p className="mt-1 text-sm text-gray-600">
                       {profile?.major || "Jurusan belum diisi"}
                     </p>
-
                     <p className="mt-2 text-xs text-gray-500">
-                      {profile?.startYear || "-"} –{" "}
-                      {profile?.graduationYear || "-"}
+                      {profile?.startYear || "-"} – {profile?.graduationYear || "-"}
                     </p>
                   </div>
                 </section>
@@ -859,23 +853,17 @@ async function loadPortfolioData() {
 
               <div className="space-y-8">
                 <section>
-                  <h2
-                    className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}
-                  >
+                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
                     <FolderKanban size={20} className={style.accent} />
                     Proyek Saya
-                    <span
-                      className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}
-                    >
+                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
                       {projects.length} proyek
                     </span>
                   </h2>
 
                   <div className="mt-4 space-y-3">
                     {projects.length === 0 ? (
-                      <p
-                        className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}
-                      >
+                      <p className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}>
                         Belum ada proyek yang ditambahkan.
                       </p>
                     ) : (
@@ -883,20 +871,12 @@ async function loadPortfolioData() {
                         const safeUrl = getSafeExternalUrl(project.link);
 
                         return (
-                          <article
-                            key={project.id}
-                            className={`p-4 ${style.card}`}
-                          >
+                          <article key={project.id} className={`p-4 ${style.card}`}>
                             <div className="flex flex-wrap items-start justify-between gap-2">
-                              <h3
-                                className={`font-semibold ${style.sectionTitle}`}
-                              >
+                              <h3 className={`font-semibold ${style.sectionTitle}`}>
                                 {project.title}
                               </h3>
-
-                              <span
-                                className={`rounded-full px-3 py-1 text-xs ${style.badge}`}
-                              >
+                              <span className={`rounded-full px-3 py-1 text-xs ${style.badge}`}>
                                 {project.category}
                               </span>
                             </div>
@@ -939,36 +919,25 @@ async function loadPortfolioData() {
                 </section>
 
                 <section>
-                  <h2
-                    className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}
-                  >
+                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
                     <Award size={20} className={style.accent} />
                     Sertifikat
-                    <span
-                      className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}
-                    >
+                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
                       {certificates.length} sertifikat
                     </span>
                   </h2>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {certificates.length === 0 ? (
-                      <p
-                        className={`p-4 text-sm text-gray-500 sm:col-span-2 ${style.soft} ${style.card}`}
-                      >
+                      <p className={`p-4 text-sm text-gray-500 sm:col-span-2 ${style.soft} ${style.card}`}>
                         Belum ada sertifikat yang ditambahkan.
                       </p>
                     ) : (
                       certificates.map((certificate) => {
-                        const safeUrl = getSafeExternalUrl(
-                          certificate.credentialUrl
-                        );
+                        const safeUrl = getSafeExternalUrl(certificate.credentialUrl);
 
                         return (
-                          <article
-                            key={certificate.id}
-                            className={`overflow-hidden ${style.card}`}
-                          >
+                          <article key={certificate.id} className={`overflow-hidden ${style.card}`}>
                             {certificate.imageDataUrl && (
                               <img
                                 src={certificate.imageDataUrl}
@@ -978,16 +947,12 @@ async function loadPortfolioData() {
                             )}
 
                             <div className="p-4">
-                              <h3
-                                className={`font-semibold ${style.sectionTitle}`}
-                              >
+                              <h3 className={`font-semibold ${style.sectionTitle}`}>
                                 {certificate.title}
                               </h3>
-
                               <p className="mt-1 text-sm text-gray-600">
                                 {certificate.issuer}
                               </p>
-
                               <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
                                 <CalendarDays size={14} />
                                 {formatDate(certificate.issueDate)}
@@ -1018,23 +983,17 @@ async function loadPortfolioData() {
                 </section>
 
                 <section>
-                  <h2
-                    className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}
-                  >
+                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
                     <Trophy size={20} className={style.accent} />
                     Pencapaian
-                    <span
-                      className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}
-                    >
+                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
                       {achievements.length} pencapaian
                     </span>
                   </h2>
 
                   <div className="mt-4 space-y-3">
                     {achievements.length === 0 ? (
-                      <p
-                        className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}
-                      >
+                      <p className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}>
                         Belum ada pencapaian yang ditambahkan.
                       </p>
                     ) : (
@@ -1053,12 +1012,9 @@ async function loadPortfolioData() {
 
                           <div className="flex-1 p-4">
                             <div className="flex flex-wrap items-start justify-between gap-2">
-                              <h3
-                                className={`font-semibold ${style.sectionTitle}`}
-                              >
+                              <h3 className={`font-semibold ${style.sectionTitle}`}>
                                 {achievement.title}
                               </h3>
-
                               <span className="rounded-full bg-green-50 px-3 py-1 text-xs text-green-700">
                                 {achievement.category}
                               </span>
@@ -1086,12 +1042,12 @@ async function loadPortfolioData() {
                 </section>
               </div>
             </div>
-          </section>
+          </motion.section>
 
           <p className="mt-5 text-center text-xs text-gray-400">
             Portofolio ini menampilkan data yang tersimpan pada akun SkillTrack.
           </p>
-        </div>
+        </motion.div>
       </main>
     </>
   );

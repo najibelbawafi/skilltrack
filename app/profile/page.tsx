@@ -1,6 +1,6 @@
 
 "use client";
-
+import Link from "next/link";
 import {
   useEffect,
   useRef,
@@ -10,6 +10,7 @@ import {
 } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import {
   User,
   Save,
@@ -18,6 +19,9 @@ import {
   CheckCircle2,
   Upload,
   X,
+  Camera,
+  ArrowLeft,
+  LoaderCircle,
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
@@ -32,6 +36,11 @@ const ALLOWED_PHOTO_TYPES = [
   "image/png",
   "image/webp",
 ];
+
+const transition = {
+  duration: 0.45,
+  ease: [0.22, 1, 0.36, 1] as const,
+};
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -125,6 +134,51 @@ async function compressPhoto(file: File): Promise<string> {
   }
 }
 
+function SectionHeading({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof User;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mb-6 flex items-center gap-3">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-[#0756A5]">
+        <Icon size={21} />
+      </div>
+
+      <div className="min-w-0">
+        <h2 className="font-bold text-[#25364A]">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <label className="mb-2 block text-sm font-semibold text-slate-700">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const inputClass =
+  "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#25364A] outline-none transition-all duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70";
+
 function ProfileForm({
   userId,
   user,
@@ -160,6 +214,7 @@ function ProfileForm({
 
   const [photoPreviewError, setPhotoPreviewError] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -263,7 +318,9 @@ function ProfileForm({
   }
 
   async function handleUploadPhoto() {
-    if (!selectedPhoto) return;
+    if (!selectedPhoto || isUploadingPhoto) return;
+
+    setIsUploadingPhoto(true);
 
     try {
       const compressedPhoto = await compressPhoto(selectedPhoto);
@@ -285,6 +342,8 @@ function ProfileForm({
 
       setMessageType("error");
       setMessage("Foto gagal diproses. Silakan coba gambar lain.");
+    } finally {
+      setIsUploadingPhoto(false);
     }
   }
 
@@ -437,10 +496,15 @@ function ProfileForm({
     return (
       <>
         <PageHeader />
-        <main className="flex min-h-[70vh] items-center justify-center bg-[#F4F7FB]">
-          <p className="text-sm text-slate-500">
+        <main className="flex min-h-[70vh] items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass flex items-center gap-3 rounded-2xl px-6 py-4 text-sm text-slate-500"
+          >
+            <LoaderCircle size={18} className="animate-spin text-[#0756A5]" />
             Memuat profil...
-          </p>
+          </motion.div>
         </main>
       </>
     );
@@ -450,105 +514,117 @@ function ProfileForm({
     <>
       <PageHeader />
 
-      <main className="min-h-screen bg-[#F4F7FB] px-4 py-8 sm:px-8">
-        <div className="mx-auto max-w-5xl">
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-[#25364A]">
-              Profil Saya
-            </h1>
+      <main className="relative min-h-screen overflow-hidden px-4 py-8 sm:px-8 sm:py-10">
+        <div className="pointer-events-none absolute -right-40 top-20 h-96 w-96 rounded-full bg-blue-200/25 blur-3xl" />
+        <div className="pointer-events-none absolute -left-40 top-[600px] h-96 w-96 rounded-full bg-sky-200/20 blur-3xl" />
 
-            <p className="mt-2 text-sm text-slate-500">
-              Lengkapi informasi diri dan pendidikan untuk membangun
-              profil digital kamu.
-            </p>
-          </div>
+        <div className="relative mx-auto max-w-5xl">
+          {/* PAGE INTRO */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={transition}
+            className="mb-8"
+          >
+            <Link
+              href="/dashboard"
+              className="mb-5 inline-flex items-center gap-2 rounded-lg text-sm font-medium text-slate-500 transition hover:text-[#0756A5]"
+            >
+              <ArrowLeft size={17} />
+              Kembali ke Dashboard
+            </Link>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-6 flex items-center gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-blue-50 text-[#0756A5]">
-                  {hasPhoto ? (
-                    <Image
-                      src={form.photoUrl}
-                      alt="Foto profil"
-                      width={48}
-                      height={48}
-                      unoptimized
-                      onError={() => setPhotoPreviewError(true)}
-                      className="h-full w-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <User size={21} />
-                  )}
+            <div className="glass relative overflow-hidden rounded-[26px] p-6 sm:p-8">
+              <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full bg-blue-200/30 blur-3xl" />
+
+              <div className="relative flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0756A5] text-white shadow-lg shadow-blue-900/15">
+                  <User size={26} />
                 </div>
 
                 <div>
-                  <h2 className="font-semibold text-[#25364A]">
-                    Informasi Pribadi
-                  </h2>
+                  <p className="text-[10px] font-bold tracking-[0.16em] text-[#0756A5]">
+                    PERSONAL WORKSPACE
+                  </p>
 
-                  <p className="text-sm text-slate-500">
-                    Informasi dasar tentang diri kamu.
+                  <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#25364A] sm:text-3xl">
+                    Profil Saya
+                  </h1>
+
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                    Lengkapi informasi diri dan pendidikan untuk membangun
+                    profil digital yang profesional.
                   </p>
                 </div>
               </div>
+            </div>
+          </motion.div>
 
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label className="mb-3 block text-sm font-medium text-slate-700">
-                    Foto Profil
-                  </label>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* PERSONAL INFORMATION */}
+            <motion.section
+              initial={{ opacity: 0, y: 22 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...transition, delay: 0.08 }}
+              className="glass-card p-5 sm:p-7"
+            >
+              <div className="relative z-10">
+                <SectionHeading
+                  icon={User}
+                  title="Informasi Pribadi"
+                  description="Informasi dasar tentang diri kamu."
+                />
 
-                  <div className="flex flex-col gap-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
-                    {hasPhoto ? (
-                      <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (selectedPhoto) {
-                              void handleUploadPhoto();
-                            } else {
-                              photoInputRef.current?.click();
-                            }
-                          }}
-                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0756A5] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
-                        >
-                          <Upload size={17} />
-                          {selectedPhoto ? "Unggah Foto" : "Ganti Foto"}
-                        </button>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  {/* PROFILE PHOTO */}
+                  <div className="sm:col-span-2">
+                    <label className="mb-3 block text-sm font-semibold text-slate-700">
+                      Foto Profil
+                    </label>
 
-                        <button
-                          type="button"
-                          onClick={handleRemovePhoto}
-                          className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                        >
-                          <X size={17} />
-                          Hapus Foto
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-5 sm:flex-row sm:items-center">
+                      <motion.div
+                        whileHover={{ scale: 1.04 }}
+                        className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-blue-50 text-[#0756A5] shadow-md"
+                      >
+                        {hasPhoto ? (
+                          <Image
+                            src={form.photoUrl}
+                            alt="Foto profil"
+                            width={96}
+                            height={96}
+                            unoptimized
+                            onError={() => setPhotoPreviewError(true)}
+                            className="h-full w-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <User size={34} />
+                        )}
+
+                        <div className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#0756A5] text-white">
+                          <Camera size={13} />
+                        </div>
+                      </motion.div>
+
+                      <div className="min-w-0 flex-1">
                         <p className="font-semibold text-[#25364A]">
-                          Unggah Foto
+                          {hasPhoto ? "Foto profil kamu" : "Tambahkan foto profil"}
                         </p>
 
-                        <p className="text-sm text-slate-500">
-                          Pilih foto dari perangkat kamu.
-                        </p>
-
-                        <p className="text-xs text-slate-400">
-                          JPG, PNG, atau WebP. Maksimal 2 MB.
+                        <p className="mt-1 text-sm text-slate-500">
+                          JPG, PNG, atau WebP. Ukuran maksimal 2 MB.
                         </p>
 
                         {selectedPhoto && (
-                          <p className="text-sm font-medium text-[#0756A5]">
+                          <p className="mt-2 break-all text-xs font-medium text-[#0756A5]">
                             File dipilih: {selectedPhoto.name}
                           </p>
                         )}
 
-                        <div>
-                          <button
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <motion.button
                             type="button"
+                            whileTap={{ scale: 0.96 }}
                             onClick={() => {
                               if (selectedPhoto) {
                                 void handleUploadPhoto();
@@ -556,275 +632,283 @@ function ProfileForm({
                                 photoInputRef.current?.click();
                               }
                             }}
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0756A5] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+                            disabled={isUploadingPhoto}
+                            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0756A5] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-900/10 transition hover:bg-blue-800 disabled:opacity-60"
                           >
-                            <Upload size={17} />
-                            {selectedPhoto ? "Unggah Foto" : "Pilih Foto"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                            {isUploadingPhoto ? (
+                              <LoaderCircle size={16} className="animate-spin" />
+                            ) : (
+                              <Upload size={16} />
+                            )}
 
-                    <input
-                      ref={photoInputRef}
-                      id="profilePhoto"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      onChange={handlePhotoChange}
-                      className="hidden"
-                    />
+                            {isUploadingPhoto
+                              ? "Memproses..."
+                              : selectedPhoto
+                                ? "Unggah Foto"
+                                : hasPhoto
+                                  ? "Ganti Foto"
+                                  : "Pilih Foto"}
+                          </motion.button>
+
+                          {hasPhoto && (
+                            <motion.button
+                              type="button"
+                              whileTap={{ scale: 0.96 }}
+                              onClick={handleRemovePhoto}
+                              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                            >
+                              <X size={16} />
+                              Hapus Foto
+                            </motion.button>
+                          )}
+                        </div>
+
+                        <input
+                          ref={photoInputRef}
+                          id="profilePhoto"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handlePhotoChange}
+                          className="hidden"
+                        />
+
+                        {photoPreviewError && (
+                          <p className="mt-3 text-xs text-red-600">
+                            Foto tidak dapat ditampilkan. Silakan unggah foto baru.
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  {photoPreviewError && (
-                    <p className="mt-3 text-xs text-red-600">
-                      Foto tidak dapat ditampilkan. Silakan unggah foto baru.
+                  <Field label="Nama Lengkap *">
+                    <input
+                      required
+                      maxLength={100}
+                      value={form.fullName}
+                      onChange={(e) => updateField("fullName", e.target.value)}
+                      placeholder="Masukkan nama lengkap"
+                      className={inputClass}
+                    />
+                  </Field>
+
+                  <Field label="Email Akun">
+                    <input
+                      type="email"
+                      value={user.email}
+                      readOnly
+                      className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 outline-none"
+                    />
+
+                    <p className="mt-2 text-xs text-slate-400">
+                      Ubah email melalui halaman Pengaturan Akun.
                     </p>
+                  </Field>
+
+                  <Field label="Nomor Telepon">
+                    <input
+                      type="tel"
+                      maxLength={20}
+                      value={form.phone}
+                      onChange={(e) => updateField("phone", e.target.value)}
+                      placeholder="08xxxxxxxxxx"
+                      className={inputClass}
+                    />
+                  </Field>
+
+                  <Field label="Jenis Kelamin">
+                    <select
+                      value={form.gender}
+                      onChange={(e) => updateField("gender", e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Pilih jenis kelamin</option>
+                      <option value="Laki-laki">Laki-laki</option>
+                      <option value="Perempuan">Perempuan</option>
+                    </select>
+                  </Field>
+
+                  <Field label="Tempat Lahir">
+                    <input
+                      maxLength={100}
+                      value={form.birthPlace}
+                      onChange={(e) => updateField("birthPlace", e.target.value)}
+                      placeholder="Kota kelahiran"
+                      className={inputClass}
+                    />
+                  </Field>
+
+                  <Field label="Tanggal Lahir">
+                    <input
+                      type="date"
+                      value={form.birthDate}
+                      onChange={(e) => updateField("birthDate", e.target.value)}
+                      max={new Date().toISOString().split("T")[0]}
+                      className={inputClass}
+                    />
+                  </Field>
+
+                  <Field label="Alamat" className="sm:col-span-2">
+                    <textarea
+                      rows={3}
+                      maxLength={500}
+                      value={form.address}
+                      onChange={(e) => updateField("address", e.target.value)}
+                      placeholder="Masukkan alamat"
+                      className={`${inputClass} resize-y`}
+                    />
+                  </Field>
+                </div>
+              </div>
+            </motion.section>
+
+            {/* EDUCATION */}
+            <motion.section
+              initial={{ opacity: 0, y: 22 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...transition, delay: 0.15 }}
+              className="glass-card p-5 sm:p-7"
+            >
+              <div className="relative z-10">
+                <SectionHeading
+                  icon={GraduationCap}
+                  title="Informasi Pendidikan"
+                  description="Riwayat pendidikan saat ini."
+                />
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Asal Sekolah">
+                    <input
+                      maxLength={150}
+                      value={form.school}
+                      onChange={(e) => updateField("school", e.target.value)}
+                      className={inputClass}
+                    />
+                  </Field>
+
+                  <Field label="Jurusan">
+                    <input
+                      maxLength={100}
+                      value={form.major}
+                      onChange={(e) => updateField("major", e.target.value)}
+                      className={inputClass}
+                    />
+                  </Field>
+
+                  <Field label="Tahun Masuk">
+                    <input
+                      type="number"
+                      min="1900"
+                      max={new Date().getFullYear() + 10}
+                      value={form.startYear}
+                      onChange={(e) => updateField("startYear", e.target.value)}
+                      placeholder="2024"
+                      className={inputClass}
+                    />
+                  </Field>
+
+                  <Field label="Tahun Lulus">
+                    <input
+                      type="number"
+                      min="1900"
+                      max={new Date().getFullYear() + 10}
+                      value={form.graduationYear}
+                      onChange={(e) =>
+                        updateField("graduationYear", e.target.value)
+                      }
+                      placeholder="2027"
+                      className={inputClass}
+                    />
+                  </Field>
+                </div>
+              </div>
+            </motion.section>
+
+            {/* BIO */}
+            <motion.section
+              initial={{ opacity: 0, y: 22 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...transition, delay: 0.22 }}
+              className="glass-card p-5 sm:p-7"
+            >
+              <div className="relative z-10">
+                <SectionHeading
+                  icon={FileText}
+                  title="Tentang Saya"
+                  description="Ceritakan minat, kemampuan, dan tujuan kamu."
+                />
+
+                <textarea
+                  rows={5}
+                  maxLength={1500}
+                  value={form.bio}
+                  onChange={(e) => updateField("bio", e.target.value)}
+                  placeholder="Tuliskan deskripsi singkat tentang diri kamu..."
+                  className={`${inputClass} resize-y`}
+                />
+
+                <p className="mt-2 text-right text-xs text-slate-400">
+                  {form.bio.length}/1500 karakter
+                </p>
+              </div>
+            </motion.section>
+
+            {/* FEEDBACK */}
+            <AnimatePresence mode="wait">
+              {message && (
+                <motion.div
+                  key={message}
+                  initial={{ opacity: 0, y: -8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, y: -8, height: 0 }}
+                  transition={{ duration: 0.22 }}
+                  role="status"
+                  className={`flex items-start gap-3 overflow-hidden rounded-2xl border p-4 text-sm ${
+                    messageType === "success"
+                      ? "border-emerald-200 bg-emerald-50/90 text-emerald-700"
+                      : "border-red-200 bg-red-50/90 text-red-700"
+                  }`}
+                >
+                  {messageType === "success" && (
+                    <CheckCircle2 size={19} className="mt-0.5 shrink-0" />
                   )}
-                </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Nama Lengkap *
-                  </label>
+                  {messageType === "error" && (
+                    <X size={19} className="mt-0.5 shrink-0" />
+                  )}
 
-                  <input
-                    required
-                    maxLength={100}
-                    value={form.fullName}
-                    onChange={(e) => updateField("fullName", e.target.value)}
-                    placeholder="Masukkan nama lengkap"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  />
-                </div>
+                  <p>{message}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Email Akun
-                  </label>
-
-                  <input
-                    type="email"
-                    value={user.email}
-                    readOnly
-                    className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 outline-none"
-                  />
-
-                  <p className="mt-2 text-xs text-slate-400">
-                    Ubah email melalui halaman Pengaturan Akun.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Nomor Telepon
-                  </label>
-
-                  <input
-                    type="tel"
-                    maxLength={20}
-                    value={form.phone}
-                    onChange={(e) => updateField("phone", e.target.value)}
-                    placeholder="08xxxxxxxxxx"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Jenis Kelamin
-                  </label>
-
-                  <select
-                    value={form.gender}
-                    onChange={(e) => updateField("gender", e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  >
-                    <option value="">Pilih jenis kelamin</option>
-                    <option value="Laki-laki">Laki-laki</option>
-                    <option value="Perempuan">Perempuan</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Tempat Lahir
-                  </label>
-
-                  <input
-                    maxLength={100}
-                    value={form.birthPlace}
-                    onChange={(e) => updateField("birthPlace", e.target.value)}
-                    placeholder="Kota kelahiran"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Tanggal Lahir
-                  </label>
-
-                  <input
-                    type="date"
-                    value={form.birthDate}
-                    onChange={(e) => updateField("birthDate", e.target.value)}
-                    max={new Date().toISOString().split("T")[0]}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Alamat
-                  </label>
-
-                  <textarea
-                    rows={3}
-                    maxLength={500}
-                    value={form.address}
-                    onChange={(e) => updateField("address", e.target.value)}
-                    placeholder="Masukkan alamat"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-6 flex items-center gap-3">
-                <div className="rounded-lg bg-blue-50 p-3 text-[#0756A5]">
-                  <GraduationCap size={21} />
-                </div>
-
-                <div>
-                  <h2 className="font-semibold text-[#25364A]">
-                    Informasi Pendidikan
-                  </h2>
-
-                  <p className="text-sm text-slate-500">
-                    Riwayat pendidikan saat ini.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Asal Sekolah
-                  </label>
-
-                  <input
-                    maxLength={150}
-                    value={form.school}
-                    onChange={(e) => updateField("school", e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Jurusan
-                  </label>
-
-                  <input
-                    maxLength={100}
-                    value={form.major}
-                    onChange={(e) => updateField("major", e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Tahun Masuk
-                  </label>
-
-                  <input
-                    type="number"
-                    min="1900"
-                    max={new Date().getFullYear() + 10}
-                    value={form.startYear}
-                    onChange={(e) => updateField("startYear", e.target.value)}
-                    placeholder="2024"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Tahun Lulus
-                  </label>
-
-                  <input
-                    type="number"
-                    min="1900"
-                    max={new Date().getFullYear() + 10}
-                    value={form.graduationYear}
-                    onChange={(e) =>
-                      updateField("graduationYear", e.target.value)
-                    }
-                    placeholder="2027"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-6 flex items-center gap-3">
-                <div className="rounded-lg bg-blue-50 p-3 text-[#0756A5]">
-                  <FileText size={21} />
-                </div>
-
-                <div>
-                  <h2 className="font-semibold text-[#25364A]">
-                    Tentang Saya
-                  </h2>
-
-                  <p className="text-sm text-slate-500">
-                    Ceritakan minat, kemampuan, dan tujuan kamu.
-                  </p>
-                </div>
-              </div>
-
-              <textarea
-                rows={5}
-                maxLength={1500}
-                value={form.bio}
-                onChange={(e) => updateField("bio", e.target.value)}
-                placeholder="Tuliskan deskripsi singkat tentang diri kamu..."
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-              />
-
-              <p className="mt-2 text-right text-xs text-slate-400">
-                {form.bio.length}/1500 karakter
+            {/* SAVE BUTTON */}
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...transition, delay: 0.28 }}
+              className="glass sticky bottom-4 z-20 flex items-center justify-between gap-3 rounded-2xl p-3 shadow-xl shadow-slate-900/5 sm:p-4"
+            >
+              <p className="hidden text-xs text-slate-500 sm:block">
+                Pastikan informasi profil sudah benar.
               </p>
-            </section>
 
-            {message && (
-              <div
-                role="status"
-                className={`flex items-center gap-2 rounded-lg p-4 text-sm ${
-                  messageType === "success"
-                    ? "bg-green-50 text-green-700"
-                    : "bg-red-50 text-red-700"
-                }`}
-              >
-                {messageType === "success" && <CheckCircle2 size={18} />}
-                {message}
-              </div>
-            )}
-
-            <div className="flex justify-end">
-              <button
+              <motion.button
                 type="submit"
-                disabled={isSaving}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                disabled={isSaving || isUploadingPhoto}
+                className="ml-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/15 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Save size={18} />
+                {isSaving ? (
+                  <LoaderCircle size={18} className="animate-spin" />
+                ) : (
+                  <Save size={18} />
+                )}
+
                 {isSaving ? "Menyimpan..." : "Simpan Profil"}
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
           </form>
         </div>
       </main>
@@ -844,10 +928,15 @@ export default function ProfilePage() {
 
   if (loading || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <p className="text-sm text-slate-500">
+      <main className="flex min-h-screen items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass flex items-center gap-3 rounded-2xl px-6 py-4 text-sm text-slate-500"
+        >
+          <LoaderCircle size={18} className="animate-spin text-[#0756A5]" />
           Memuat profil...
-        </p>
+        </motion.div>
       </main>
     );
   }

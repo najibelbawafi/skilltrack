@@ -13,6 +13,7 @@ import {
   Trophy,
   FileText,
 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { supabase } from "@/lib/supabase";
 
@@ -169,6 +170,17 @@ const CV_THEMES: ThemeConfig[] = [
   },
 ];
 
+const pageTransition = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+};
+
+const sectionTransition = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+};
+
 function formatDate(value: string) {
   if (!value) return "-";
 
@@ -190,17 +202,38 @@ function isCVTheme(value: string | null): value is CVTheme {
 
 function LoadingPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-      <p className="text-sm text-gray-500">Memuat CV siswa...</p>
+    <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-5">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card flex w-full max-w-sm flex-col items-center gap-4 p-8 text-center"
+      >
+        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-blue-100 border-t-[#0756A5]" />
+        <div>
+          <p className="text-sm font-semibold text-[#25364A]">
+            Memuat CV siswa
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Sedang mengambil data CV publik.
+          </p>
+        </div>
+      </motion.div>
     </main>
   );
 }
 
 function NotAvailablePage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-5">
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-        <FileText size={42} className="mx-auto mb-4 text-gray-400" />
+    <motion.main
+      initial="initial"
+      animate="animate"
+      variants={pageTransition}
+      className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-5"
+    >
+      <div className="glass-card w-full max-w-md p-8 text-center">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-[#0756A5]">
+          <FileText size={30} />
+        </div>
 
         <h1 className="text-xl font-bold text-[#25364A]">
           CV Tidak Tersedia
@@ -212,13 +245,13 @@ function NotAvailablePage() {
 
         <Link
           href="/directory"
-          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
+          className="glass-button mt-6 inline-flex items-center gap-2 rounded-xl bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
         >
           <ArrowLeft size={17} />
           Kembali ke Direktori
         </Link>
       </div>
-    </main>
+    </motion.main>
   );
 }
 
@@ -303,8 +336,17 @@ export default function PublicCVPage({
 
   if (error) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-5">
-        <div className="w-full max-w-md rounded-xl border border-red-200 bg-white p-8 text-center shadow-sm">
+      <motion.main
+        initial="initial"
+        animate="animate"
+        variants={pageTransition}
+        className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-5"
+      >
+        <div className="glass-card w-full max-w-md p-8 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+            <FileText size={30} />
+          </div>
+
           <h1 className="text-xl font-bold text-[#25364A]">
             CV Gagal Dimuat
           </h1>
@@ -314,12 +356,12 @@ export default function PublicCVPage({
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-6 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+            className="glass-button mt-6 rounded-xl bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
           >
             Muat Ulang
           </button>
         </div>
-      </main>
+      </motion.main>
     );
   }
 
@@ -392,7 +434,7 @@ export default function PublicCVPage({
           {skills.map((skill) => (
             <span
               key={skill.id}
-              className="rounded-md px-3 py-2 text-xs font-medium"
+              className="rounded-lg px-3 py-2 text-xs font-medium"
               style={{
                 backgroundColor: theme.soft,
                 color: theme.accent,
@@ -417,7 +459,10 @@ export default function PublicCVPage({
       {projects.length > 0 ? (
         <div className="space-y-4">
           {projects.map((project) => (
-            <article key={project.id}>
+            <article
+              key={project.id}
+              className="rounded-lg transition-colors"
+            >
               <div className="flex flex-wrap justify-between gap-2">
                 <h3
                   className="font-semibold"
@@ -457,7 +502,7 @@ export default function PublicCVPage({
                     href={project.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-2 inline-block text-xs font-semibold hover:underline"
+                    className="mt-2 inline-block text-xs font-semibold transition hover:underline"
                     style={{ color: theme.accent }}
                   >
                     Lihat Proyek
@@ -481,9 +526,11 @@ export default function PublicCVPage({
       {certificates.length > 0 ? (
         <div className="space-y-4">
           {certificates.map((certificate) => (
-            <article
+            <motion.article
               key={certificate.id}
-              className="overflow-hidden rounded-lg border border-gray-200"
+              whileHover={{ y: -2 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden rounded-xl border border-gray-200"
             >
               {certificate.imageDataUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -525,14 +572,14 @@ export default function PublicCVPage({
                       href={certificate.credentialUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-3 inline-block text-xs font-semibold hover:underline"
+                      className="mt-3 inline-block text-xs font-semibold transition hover:underline"
                       style={{ color: theme.accent }}
                     >
                       Lihat Kredensial
                     </a>
                   )}
               </div>
-            </article>
+            </motion.article>
           ))}
         </div>
       ) : (
@@ -550,9 +597,11 @@ export default function PublicCVPage({
       {achievements.length > 0 ? (
         <div className="space-y-4">
           {achievements.map((achievement) => (
-            <article
+            <motion.article
               key={achievement.id}
-              className="overflow-hidden rounded-lg border border-gray-200"
+              whileHover={{ y: -2 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden rounded-xl border border-gray-200"
             >
               {achievement.imageDataUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -595,7 +644,7 @@ export default function PublicCVPage({
                   </p>
                 )}
               </div>
-            </article>
+            </motion.article>
           ))}
         </div>
       ) : (
@@ -607,117 +656,150 @@ export default function PublicCVPage({
   );
 
   return (
-    <main className="min-h-screen bg-[#F4F7FB]">
-      <header className="border-b border-gray-200 bg-white">
+    <motion.main
+      initial="initial"
+      animate="animate"
+      variants={pageTransition}
+      transition={{ duration: 0.45, ease: "easeOut" }}
+      className="min-h-screen bg-[#F4F7FB]"
+    >
+      <motion.header
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="glass sticky top-0 z-30 border-b border-white/70"
+      >
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Link
             href="/directory"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 transition hover:text-[#0756A5]"
+            className="inline-flex items-center gap-2 rounded-lg text-sm font-semibold text-gray-600 transition-colors hover:text-[#0756A5]"
           >
             <ArrowLeft size={18} />
             Kembali ke Direktori
           </Link>
 
-          <span className="rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
+          <span className="rounded-full border border-green-100 bg-green-50/90 px-3 py-1.5 text-xs font-semibold text-green-700">
             CV Publik
           </span>
         </div>
-      </header>
+      </motion.header>
 
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <div
-          className="mx-auto min-h-[900px] w-full max-w-[794px] rounded-xl p-6 shadow-sm sm:p-10"
-          style={{
-            color: theme.text,
-            backgroundColor: "#FFFFFF",
-            fontFamily:
-              selectedTheme === "executive"
-                ? "Georgia, serif"
-                : "Arial, sans-serif",
-          }}
-        >
-          <div
-            className={`pb-6 ${
-              selectedTheme === "creative"
-                ? "border-l-8 pl-5"
-                : "border-b-4"
-            }`}
-            style={{ borderColor: theme.border }}
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={selectedTheme}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="mx-auto w-full max-w-[794px]"
           >
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              {profile.photoUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={profile.photoUrl}
-                  alt={`Foto ${fullName}`}
-                  className={`h-24 w-24 object-cover ${
-                    selectedTheme === "monochrome"
-                      ? "rounded-none"
-                      : "rounded-full"
-                  }`}
-                  style={{ border: `2px solid ${theme.soft}` }}
-                />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.99 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="min-h-[900px] rounded-xl p-6 shadow-[0_12px_45px_rgba(31,65,110,0.09)] sm:p-10"
+              style={{
+                color: theme.text,
+                backgroundColor: "#FFFFFF",
+                fontFamily:
+                  selectedTheme === "executive"
+                    ? "Georgia, serif"
+                    : "Arial, sans-serif",
+              }}
+            >
+              <div
+                className={`pb-6 ${
+                  selectedTheme === "creative"
+                    ? "border-l-8 pl-5"
+                    : "border-b-4"
+                }`}
+                style={{ borderColor: theme.border }}
+              >
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                  {profile.photoUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profile.photoUrl}
+                      alt={`Foto ${fullName}`}
+                      className={`h-24 w-24 object-cover ${
+                        selectedTheme === "monochrome"
+                          ? "rounded-none"
+                          : "rounded-full"
+                      }`}
+                      style={{ border: `2px solid ${theme.soft}` }}
+                    />
+                  )}
+
+                  <div className="min-w-0">
+                    <p
+                      className="text-xs font-bold tracking-[3px]"
+                      style={{ color: theme.accent }}
+                    >
+                      CURRICULUM VITAE
+                    </p>
+
+                    <h1 className="mt-2 break-words text-3xl font-bold">
+                      {fullName}
+                    </h1>
+
+                    <p
+                      className="mt-2 text-sm"
+                      style={{ color: theme.muted }}
+                    >
+                      {profile.major || "Jurusan belum diisi"}
+                      {profile.school ? ` | ${profile.school}` : ""}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {isTwoColumn ? (
+                <div className="grid grid-cols-1 gap-7 pt-7 sm:grid-cols-[0.85fr_1.15fr]">
+                  <div className="space-y-7">
+                    {profileSection}
+                    {educationSection}
+                    {skillsSection}
+                  </div>
+
+                  <div className="space-y-7">
+                    {projectsSection}
+                    {certificatesSection}
+                    {achievementsSection}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-7 pt-7">
+                  {profileSection}
+                  {educationSection}
+                  {skillsSection}
+                  {projectsSection}
+                  {certificatesSection}
+                  {achievementsSection}
+                </div>
               )}
 
-              <div className="min-w-0">
-                <p
-                  className="text-xs font-bold tracking-[3px]"
-                  style={{ color: theme.accent }}
-                >
-                  CURRICULUM VITAE
-                </p>
-
-                <h1 className="mt-2 break-words text-3xl font-bold">
-                  {fullName}
-                </h1>
-
-                <p
-                  className="mt-2 text-sm"
-                  style={{ color: theme.muted }}
-                >
-                  {profile.major || "Jurusan belum diisi"}
-                  {profile.school ? ` | ${profile.school}` : ""}
-                </p>
+              <div
+                className="mt-10 border-t pt-4 text-center text-[10px]"
+                style={{
+                  borderColor: theme.border,
+                  color: theme.muted,
+                }}
+              >
+                Dibuat menggunakan SkillTrack Student Portfolio Platform
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>
 
-          {isTwoColumn ? (
-            <div className="grid grid-cols-1 gap-7 pt-7 sm:grid-cols-[0.85fr_1.15fr]">
-              <div className="space-y-7">
-                {profileSection}
-                {educationSection}
-                {skillsSection}
-              </div>
-
-              <div className="space-y-7">
-                {projectsSection}
-                {certificatesSection}
-                {achievementsSection}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-7 pt-7">
-              {profileSection}
-              {educationSection}
-              {skillsSection}
-              {projectsSection}
-              {certificatesSection}
-              {achievementsSection}
-            </div>
-          )}
-
-          <div
-            className="mt-10 border-t pt-4 text-center text-[10px]"
-            style={{
-              borderColor: theme.border,
-              color: theme.muted,
-            }}
-          >
-            Dibuat menggunakan SkillTrack Student Portfolio Platform
-          </div>
-        </div>
+        <motion.p
+          {...sectionTransition}
+          transition={{ delay: 0.2, duration: 0.4 }}
+          className="mt-5 text-center text-xs text-gray-400"
+        >
+          Curriculum Vitae · SkillTrack
+        </motion.p>
       </div>
-    </main>
+    </motion.main>
   );
 }

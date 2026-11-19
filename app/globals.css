@@ -3,8 +3,20 @@
 
 :root {
   color-scheme: light;
-  --background: #F4F7FB;
-  --foreground: #25364A;
+
+  --background: #f4f7fb;
+  --foreground: #25364a;
+  --primary: #0756a5;
+  --primary-light: #eaf3ff;
+
+  --glass-bg: rgba(255, 255, 255, 0.68);
+  --glass-bg-strong: rgba(255, 255, 255, 0.84);
+  --glass-border: rgba(255, 255, 255, 0.82);
+  --glass-shadow:
+    0 8px 32px rgba(31, 65, 110, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  --font-main: var(--font-geist-sans);
 }
 
 @theme inline {
@@ -20,23 +32,189 @@
 
 html {
   color-scheme: light;
+  scroll-behavior: smooth;
+  scroll-padding-top: 100px;
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      ellipse at 10% 0%,
+      rgba(179, 211, 255, 0.28),
+      transparent 38%
+    ),
+    radial-gradient(
+      ellipse at 95% 15%,
+      rgba(210, 229, 255, 0.32),
+      transparent 35%
+    ),
+    var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-main), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
+/* Smooth interactions */
+a,
+button,
 input,
 textarea,
 select {
-  color: #25364A;
-  background-color: #FFFFFF;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a,
+button {
+  transition:
+    color 220ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+/* Liquid Glass surfaces */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.glass-strong {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(30px) saturate(185%);
+  -webkit-backdrop-filter: blur(30px) saturate(185%);
+}
+
+.glass-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  transition:
+    transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 300ms ease,
+    border-color 300ms ease;
+}
+
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.55),
+    transparent 42%,
+    rgba(220, 235, 255, 0.12)
+  );
+}
+
+.glass-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 1);
+  box-shadow:
+    0 16px 40px rgba(31, 65, 110, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* Glass buttons */
+.glass-button {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 4px 16px rgba(31, 65, 110, 0.07);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: all 220ms ease;
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 22px rgba(31, 65, 110, 0.12);
+  transform: translateY(-2px);
+}
+
+.glass-button:active {
+  transform: scale(0.97);
+}
+
+/* Inputs */
+input,
+textarea,
+select {
+  color: var(--foreground);
+  background-color: rgba(255, 255, 255, 0.78);
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #9CA3AF;
+  color: #9ca3af;
   opacity: 1;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: rgba(7, 86, 165, 0.55);
+  box-shadow: 0 0 0 4px rgba(7, 86, 165, 0.09);
+}
+
+/* Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 130, 170, 0.35) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(100, 130, 170, 0.3);
+  border-radius: 99px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Selection */
+::selection {
+  color: #0756a5;
+  background: rgba(147, 197, 253, 0.3);
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (hover: none) {
+  .glass-card:hover {
+    transform: none;
+  }
 }

@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -246,6 +247,15 @@ const CV_THEMES: ThemeConfig[] = [
   },
 ];
 
+const panelClass =
+  "glass-card rounded-2xl p-5";
+
+const inputClass =
+  "w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-3 text-sm text-[#25364A] outline-none transition placeholder:text-gray-400 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70";
+
+const primaryButtonClass =
+  "flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#064783] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60";
+
 function formatDate(value: string) {
   if (!value) return "-";
 
@@ -338,6 +348,29 @@ function mapSkill(row: SkillRow): StudentSkill {
   };
 }
 
+function SectionHeading({
+  icon,
+  children,
+  theme,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+  theme: ThemeConfig;
+}) {
+  return (
+    <h2
+      className="mb-3 flex items-center gap-2 border-b pb-2 text-base font-bold"
+      style={{
+        color: theme.text,
+        borderColor: theme.border,
+      }}
+    >
+      <span style={{ color: theme.accent }}>{icon}</span>
+      {children}
+    </h2>
+  );
+}
+
 export default function CVPage() {
   const router = useRouter();
   const cvRef = useRef<HTMLDivElement>(null);
@@ -349,8 +382,8 @@ export default function CVPage() {
   const [projects, setProjects] = useState<StudentProject[]>([]);
   const [certificates, setCertificates] = useState<StudentCertificate[]>([]);
   const [achievements, setAchievements] = useState<StudentAchievement[]>([]);
-
   const [skills, setSkills] = useState<StudentSkill[]>([]);
+
   const [newSkill, setNewSkill] = useState("");
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -378,9 +411,15 @@ export default function CVPage() {
       setSkillsLoading(true);
       setError("");
 
-      const savedTheme = localStorage.getItem(
-        `skilltrack_cv_theme_${userId}`
-      );
+      let savedTheme: string | null = null;
+
+      try {
+        savedTheme = localStorage.getItem(
+          `skilltrack_cv_theme_${userId}`
+        );
+      } catch {
+        savedTheme = null;
+      }
 
       setSelectedTheme(
         isCVTheme(savedTheme) ? savedTheme : "formal"
@@ -459,12 +498,11 @@ export default function CVPage() {
       }
 
       if (certificatesResult.error) {
-        console.error(
-          "Gagal memuat sertifikat:",
-          certificatesResult.error
-        );
+        console.error("Gagal memuat sertifikat:", certificatesResult.error);
         loadErrors.push("sertifikat");
-        setCertificates([]);
+        setCertificates(
+          []
+        );
       } else {
         setCertificates(
           ((certificatesResult.data ?? []) as CertificateRow[]).map(
@@ -474,14 +512,9 @@ export default function CVPage() {
       }
 
       if (achievementsResult.error) {
-        console.error(
-          "Gagal memuat pencapaian:",
-          achievementsResult.error
-        );
+        console.error("Gagal memuat pencapaian:", achievementsResult.error);
         loadErrors.push("pencapaian");
-        setAchievements(
-          []
-        );
+        setAchievements([]);
       } else {
         setAchievements(
           ((achievementsResult.data ?? []) as AchievementRow[]).map(
@@ -491,10 +524,7 @@ export default function CVPage() {
       }
 
       if (skillsResult.error) {
-        console.error(
-          "Gagal memuat keterampilan:",
-          skillsResult.error
-        );
+        console.error("Gagal memuat keterampilan:", skillsResult.error);
         loadErrors.push("keterampilan");
         setSkills([]);
       } else {
@@ -543,7 +573,7 @@ export default function CVPage() {
   }, [userId, user]);
 
   const theme =
-    CV_THEMES.find((item) => item.id === selectedTheme) ||
+    CV_THEMES.find((item) => item.id === selectedTheme) ??
     CV_THEMES[0];
 
   function changeTheme(themeId: CVTheme) {
@@ -551,10 +581,14 @@ export default function CVPage() {
 
     setSelectedTheme(themeId);
 
-    localStorage.setItem(
-      `skilltrack_cv_theme_${userId}`,
-      themeId
-    );
+    try {
+      localStorage.setItem(
+        `skilltrack_cv_theme_${userId}`,
+        themeId
+      );
+    } catch (err) {
+      console.error("Gagal menyimpan tema CV:", err);
+    }
   }
 
   async function toggleCVPublication() {
@@ -579,9 +613,7 @@ export default function CVPage() {
           }
         );
 
-      if (publicationError) {
-        throw publicationError;
-      }
+      if (publicationError) throw publicationError;
 
       setCvIsPublic(nextStatus);
     } catch (err) {
@@ -632,9 +664,10 @@ export default function CVPage() {
 
       if (insertError) throw insertError;
 
-      const newSkillData = mapSkill(data as SkillRow);
-
-      setSkills((previous) => [...previous, newSkillData]);
+      setSkills((previous) => [
+        ...previous,
+        mapSkill(data as SkillRow),
+      ]);
       setNewSkill("");
     } catch (err) {
       console.error("Gagal menambahkan keterampilan:", err);
@@ -697,30 +730,30 @@ export default function CVPage() {
   if (authLoading || !user || !loaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <p className="text-sm text-gray-500">Memuat CV...</p>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card flex items-center gap-3 rounded-2xl px-5 py-4"
+        >
+          <LoaderCircle
+            size={19}
+            className="animate-spin text-[#0756A5]"
+          />
+          <p className="text-sm text-gray-600">Memuat CV...</p>
+        </motion.div>
       </main>
     );
   }
 
   const fullName = profile?.fullName || user.name;
   const email = profile?.email || user.email;
-
-  const sectionTitle = (icon: ReactNode, title: string) => (
-    <h2
-      className="mb-3 flex items-center gap-2 border-b pb-2 text-base font-bold"
-      style={{
-        color: theme.text,
-        borderColor: theme.border,
-      }}
-    >
-      <span style={{ color: theme.accent }}>{icon}</span>
-      {title}
-    </h2>
-  );
+  const twoColumn = selectedTheme === "two-column";
 
   const profileSection = (
     <section>
-      {sectionTitle(<User size={18} />, "PROFIL SINGKAT")}
+      <SectionHeading icon={<User size={18} />} theme={theme}>
+        PROFIL SINGKAT
+      </SectionHeading>
       <p
         className="whitespace-pre-line text-sm leading-7"
         style={{ color: theme.muted }}
@@ -732,7 +765,12 @@ export default function CVPage() {
 
   const educationSection = (
     <section>
-      {sectionTitle(<GraduationCap size={18} />, "PENDIDIKAN")}
+      <SectionHeading
+        icon={<GraduationCap size={18} />}
+        theme={theme}
+      >
+        PENDIDIKAN
+      </SectionHeading>
       <div>
         <h3 className="font-semibold" style={{ color: theme.text }}>
           {profile?.school || "Sekolah belum diisi"}
@@ -749,7 +787,12 @@ export default function CVPage() {
 
   const skillsSection = (
     <section>
-      {sectionTitle(<BriefcaseBusiness size={18} />, "KETERAMPILAN")}
+      <SectionHeading
+        icon={<BriefcaseBusiness size={18} />}
+        theme={theme}
+      >
+        KETERAMPILAN
+      </SectionHeading>
       {skills.length === 0 ? (
         <p className="text-sm" style={{ color: theme.muted }}>
           Belum ada keterampilan yang ditambahkan.
@@ -775,7 +818,12 @@ export default function CVPage() {
 
   const projectsSection = (
     <section>
-      {sectionTitle(<FolderKanban size={18} />, "PROYEK")}
+      <SectionHeading
+        icon={<FolderKanban size={18} />}
+        theme={theme}
+      >
+        PROYEK
+      </SectionHeading>
       <div className="space-y-4">
         {projects.length === 0 ? (
           <p className="text-sm" style={{ color: theme.muted }}>
@@ -821,7 +869,9 @@ export default function CVPage() {
 
   const certificatesSection = (
     <section>
-      {sectionTitle(<Award size={18} />, "SERTIFIKAT")}
+      <SectionHeading icon={<Award size={18} />} theme={theme}>
+        SERTIFIKAT
+      </SectionHeading>
       <div className="space-y-3">
         {certificates.length === 0 ? (
           <p className="text-sm" style={{ color: theme.muted }}>
@@ -848,7 +898,9 @@ export default function CVPage() {
 
   const achievementsSection = (
     <section>
-      {sectionTitle(<Trophy size={18} />, "PENCAPAIAN")}
+      <SectionHeading icon={<Trophy size={18} />} theme={theme}>
+        PENCAPAIAN
+      </SectionHeading>
       <div className="space-y-3">
         {achievements.length === 0 ? (
           <p className="text-sm" style={{ color: theme.muted }}>
@@ -860,10 +912,7 @@ export default function CVPage() {
               <h3 className="font-semibold" style={{ color: theme.text }}>
                 {achievement.title}
               </h3>
-              <p
-                className="mt-1 text-xs"
-                style={{ color: theme.accent }}
-              >
+              <p className="mt-1 text-xs" style={{ color: theme.accent }}>
                 {achievement.category}
               </p>
               <p className="mt-1 text-sm" style={{ color: theme.muted }}>
@@ -887,15 +936,18 @@ export default function CVPage() {
     </section>
   );
 
-  const twoColumn = selectedTheme === "two-column";
-
   return (
     <main className="min-h-screen bg-[#F4F7FB]">
-      <header className="border-b border-gray-200 bg-white">
+      <motion.header
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="glass-strong sticky top-0 z-30 border-b border-white/70"
+      >
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-6">
           <Link
             href="/dashboard"
-            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+            className="glass-button flex h-10 w-10 items-center justify-center rounded-xl text-gray-600"
             aria-label="Kembali ke dashboard"
           >
             <ArrowLeft size={19} />
@@ -908,11 +960,16 @@ export default function CVPage() {
             </p>
           </div>
         </div>
-      </header>
+      </motion.header>
 
       <div className="mx-auto grid max-w-6xl gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[300px_1fr]">
-        <aside className="h-fit space-y-5">
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <motion.aside
+          initial={{ opacity: 0, x: -14 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.05 }}
+          className="h-fit space-y-5"
+        >
+          <section className={panelClass}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-bold text-[#25364A]">
@@ -934,22 +991,23 @@ export default function CVPage() {
               </span>
             </div>
 
-            <div className="mt-4 rounded-lg bg-gray-50 p-3">
-              <p className="text-sm text-gray-600">
+            <div className="mt-4 rounded-xl border border-white/80 bg-white/60 p-3">
+              <p className="text-sm leading-6 text-gray-600">
                 {cvIsPublic
                   ? "CV kamu dapat dibuka melalui Direktori Siswa."
                   : "CV kamu belum dapat dilihat oleh pengunjung Direktori Siswa."}
               </p>
             </div>
 
-            <button
+            <motion.button
+              whileTap={{ scale: 0.98 }}
               type="button"
               onClick={toggleCVPublication}
               disabled={savingPublication}
-              className={`mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              className={`mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 cvIsPublic
-                  ? "border border-red-200 bg-white text-red-600 hover:bg-red-50"
-                  : "bg-[#0756A5] text-white hover:bg-blue-800"
+                  ? "border border-red-200 bg-white/80 text-red-600 hover:bg-red-50"
+                  : primaryButtonClass
               }`}
             >
               {savingPublication ? (
@@ -962,10 +1020,10 @@ export default function CVPage() {
                 : cvIsPublic
                   ? "Jadikan Privat"
                   : "Publikasikan CV"}
-            </button>
-          </div>
+            </motion.button>
+          </section>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <section className={panelClass}>
             <h2 className="font-bold text-[#25364A]">
               Pilih Tema CV
             </h2>
@@ -979,18 +1037,20 @@ export default function CVPage() {
                 const active = selectedTheme === item.id;
 
                 return (
-                  <button
+                  <motion.button
                     key={item.id}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.97 }}
                     type="button"
                     onClick={() => changeTheme(item.id)}
-                    className={`rounded-lg border p-2 text-left transition ${
+                    className={`rounded-xl border p-2 text-left transition ${
                       active
-                        ? "border-[#0756A5] bg-blue-50 ring-1 ring-[#0756A5]"
-                        : "border-gray-200 hover:border-gray-400"
+                        ? "border-[#0756A5] bg-blue-50/80 ring-1 ring-[#0756A5]"
+                        : "border-white/80 bg-white/50 hover:border-gray-300 hover:bg-white/80"
                     }`}
                   >
                     <div
-                      className="mb-2 flex h-12 items-center justify-center rounded-md"
+                      className="mb-2 flex h-12 items-center justify-center rounded-lg"
                       style={{ backgroundColor: item.soft }}
                     >
                       <div
@@ -1011,24 +1071,27 @@ export default function CVPage() {
                         {item.name}
                       </span>
                       {active && (
-                        <Check size={14} className="shrink-0 text-[#0756A5]" />
+                        <Check
+                          size={14}
+                          className="shrink-0 text-[#0756A5]"
+                        />
                       )}
                     </div>
 
                     <p className="mt-1 text-[10px] leading-4 text-gray-500">
                       {item.description}
                     </p>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
 
-            <p className="mt-3 rounded-lg bg-green-50 p-2 text-[11px] text-green-700">
+            <p className="mt-3 rounded-xl border border-green-100 bg-green-50/80 p-3 text-[11px] leading-5 text-green-700">
               Tema tersimpan otomatis dan akan digunakan saat mengunduh PDF.
             </p>
-          </div>
+          </section>
 
-          <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5">
+          <section className={`${panelClass} space-y-4`}>
             <div>
               <h2 className="font-bold text-[#25364A]">
                 Keterampilan
@@ -1053,13 +1116,14 @@ export default function CVPage() {
                 onChange={(event) => setNewSkill(event.target.value)}
                 placeholder="Contoh: Arduino, IoT, Python"
                 maxLength={60}
-                className="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm outline-none focus:border-[#0756A5] focus:ring-2 focus:ring-blue-100"
+                className={inputClass}
               />
 
-              <button
+              <motion.button
+                whileTap={{ scale: 0.98 }}
                 type="submit"
                 disabled={savingSkill || skillsLoading}
-                className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0756A5] px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className={`${primaryButtonClass} w-full`}
               >
                 {savingSkill ? (
                   <LoaderCircle size={17} className="animate-spin" />
@@ -1067,57 +1131,71 @@ export default function CVPage() {
                   <Plus size={17} />
                 )}
                 {savingSkill ? "Menyimpan..." : "Tambah Keterampilan"}
-              </button>
+              </motion.button>
             </form>
 
-            {error && (
-              <p
-                role="alert"
-                className="rounded-lg bg-red-50 p-3 text-xs text-red-700"
-              >
-                {error}
-              </p>
-            )}
+            <AnimatePresence>
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  role="alert"
+                  className="rounded-xl border border-red-100 bg-red-50/90 p-3 text-xs leading-5 text-red-700"
+                >
+                  {error}
+                </motion.p>
+              )}
+            </AnimatePresence>
 
             <div className="space-y-2">
               {skillsLoading ? (
-                <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
+                <p className="rounded-xl bg-white/60 p-3 text-xs text-gray-500">
                   Memuat keterampilan...
                 </p>
               ) : skills.length === 0 ? (
-                <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
+                <p className="rounded-xl bg-white/60 p-3 text-xs leading-5 text-gray-500">
                   Belum ada keterampilan. Tambahkan keterampilan untuk
                   melengkapi CV.
                 </p>
               ) : (
-                skills.map((skill) => (
-                  <div
-                    key={skill.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2"
-                  >
-                    <span className="break-all text-sm text-[#25364A]">
-                      {skill.name}
-                    </span>
-
-                    <button
-                      type="button"
-                      disabled={deletingSkillId === skill.id}
-                      onClick={() => removeSkill(skill.id)}
-                      className="shrink-0 rounded-md p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                      aria-label={`Hapus ${skill.name}`}
+                <AnimatePresence initial={false}>
+                  {skills.map((skill) => (
+                    <motion.div
+                      key={skill.id}
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-white/80 bg-white/60 px-3 py-2"
                     >
-                      {deletingSkillId === skill.id ? (
-                        <LoaderCircle size={16} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
-                    </button>
-                  </div>
-                ))
+                      <span className="break-all text-sm text-[#25364A]">
+                        {skill.name}
+                      </span>
+
+                      <button
+                        type="button"
+                        disabled={deletingSkillId === skill.id}
+                        onClick={() => removeSkill(skill.id)}
+                        className="shrink-0 rounded-lg p-2 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                        aria-label={`Hapus ${skill.name}`}
+                      >
+                        {deletingSkillId === skill.id ? (
+                          <LoaderCircle
+                            size={16}
+                            className="animate-spin"
+                          />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
+                      </button>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               )}
             </div>
 
-            <div className="border-t border-gray-100 pt-4">
+            <div className="border-t border-white/80 pt-4">
               <p className="text-xs leading-5 text-gray-500">
                 Data profil, proyek, sertifikat, pencapaian, keterampilan,
                 dan pengaturan publikasi CV diambil dari Supabase.
@@ -1126,28 +1204,34 @@ export default function CVPage() {
 
             <Link
               href="/profile"
-              className="block text-center text-sm font-semibold text-[#0756A5] hover:underline"
+              className="block text-center text-sm font-semibold text-[#0756A5] transition hover:text-blue-800 hover:underline"
             >
               Edit Profil Saya
             </Link>
-          </div>
-        </aside>
+          </section>
+        </motion.aside>
 
-        <section className="min-w-0">
+        <motion.section
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="min-w-0"
+        >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-bold text-[#25364A]">
               <FileText size={19} className="text-[#0756A5]" />
               Preview CV
             </h2>
 
-            <span className="text-xs text-gray-500">
+            <span className="rounded-full border border-white/80 bg-white/60 px-3 py-1.5 text-xs text-gray-500">
               Tema: {theme.name} | Format A4
             </span>
           </div>
 
+          {/* Dokumen CV sengaja tetap putih solid untuk menjaga hasil PDF. */}
           <div
             ref={cvRef}
-            className="mx-auto min-h-[900px] w-full max-w-[794px] p-6 shadow-sm sm:p-10"
+            className="mx-auto min-h-[900px] w-full max-w-[794px] overflow-hidden bg-white p-6 shadow-[0_12px_45px_rgba(31,65,110,0.10)] sm:p-10"
             style={{
               color: theme.text,
               backgroundColor: theme.header,
@@ -1265,11 +1349,13 @@ export default function CVPage() {
           </div>
 
           <div className="mt-5 flex justify-end">
-            <button
+            <motion.button
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.98 }}
               type="button"
               onClick={handleDownload}
               disabled={generatingPdf}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className={primaryButtonClass}
             >
               {generatingPdf ? (
                 <LoaderCircle size={17} className="animate-spin" />
@@ -1278,15 +1364,15 @@ export default function CVPage() {
               )}
 
               {generatingPdf ? "Membuat PDF..." : "Unduh CV PDF"}
-            </button>
+            </motion.button>
           </div>
 
           {error && (
-            <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            <p className="mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">
               {error}
             </p>
           )}
-        </section>
+        </motion.section>
       </div>
     </main>
   );
