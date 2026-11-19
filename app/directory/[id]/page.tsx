@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   GraduationCap,
@@ -18,6 +17,10 @@ import {
 
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/lib/supabase";
+
+type PageProps = {
+  params: Promise<{ id: string }>;
+};
 
 type PublicProfile = {
   id: string;
@@ -102,15 +105,42 @@ function NotFoundPage() {
   );
 }
 
-export default function StudentDetailPage() {
-  const params = useParams<{ id: string }>();
-  const studentId = params.id;
-
+export default function StudentDetailPage({ params }: PageProps) {
+  const [studentId, setStudentId] = useState("");
   const [portfolio, setPortfolio] = useState<PublicPortfolio | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let mounted = true;
+
+    async function resolveParams() {
+      try {
+        const resolvedParams = await params;
+
+        if (mounted) {
+          setStudentId(resolvedParams.id);
+        }
+      } catch (err) {
+        console.error("Gagal membaca parameter halaman:", err);
+
+        if (mounted) {
+          setError("Alamat portofolio tidak valid.");
+          setLoading(false);
+        }
+      }
+    }
+
+    resolveParams();
+
+    return () => {
+      mounted = false;
+    };
+  }, [params]);
+
+  useEffect(() => {
+    if (!studentId) return;
+
     let mounted = true;
 
     async function loadPortfolio() {
@@ -150,9 +180,7 @@ export default function StudentDetailPage() {
       }
     }
 
-    if (studentId) {
-      loadPortfolio();
-    }
+    loadPortfolio();
 
     return () => {
       mounted = false;
