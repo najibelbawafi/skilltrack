@@ -6,7 +6,6 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft,
   User,
   Mail,
   Lock,
@@ -20,6 +19,8 @@ import {
   Trash2,
   AlertTriangle,
 } from "lucide-react";
+
+import PageHeader from "@/components/PageHeader";
 
 import {
   getCurrentUser,
@@ -156,21 +157,7 @@ function SettingsForm({ user }: SettingsFormProps) {
 
   return (
     <main className="min-h-screen bg-[#F4F7FB]">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-5">
-          <Link href="/" className="text-2xl font-bold text-[#0756A5]">
-            SkillTrack
-          </Link>
-
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-[#0756A5]"
-          >
-            <ArrowLeft size={17} />
-            Dashboard
-          </Link>
-        </div>
-      </header>
+      <PageHeader />
 
       <section className="mx-auto max-w-4xl px-6 py-10">
         <div className="mb-8">
@@ -258,11 +245,18 @@ function SettingsForm({ user }: SettingsFormProps) {
           </div>
 
           <div>
-            <label htmlFor="name" className="mb-2 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="name"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Nama Lengkap
             </label>
+
             <div className="relative">
-              <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <User
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
               <input
                 id="name"
                 type="text"
@@ -275,11 +269,18 @@ function SettingsForm({ user }: SettingsFormProps) {
           </div>
 
           <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Email
             </label>
+
             <div className="relative">
-              <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Mail
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
               <input
                 id="email"
                 type="email"
@@ -301,11 +302,18 @@ function SettingsForm({ user }: SettingsFormProps) {
           </div>
 
           <div>
-            <label htmlFor="currentPassword" className="mb-2 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="currentPassword"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Password Saat Ini
             </label>
+
             <div className="relative">
-              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Lock
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
               <input
                 id="currentPassword"
                 type={showPassword ? "text" : "password"}
@@ -315,11 +323,16 @@ function SettingsForm({ user }: SettingsFormProps) {
                 placeholder="Masukkan password saat ini"
                 className="w-full rounded-lg border border-gray-300 py-3 pl-10 pr-12 text-sm text-gray-800 outline-none focus:border-[#0756A5] focus:ring-2 focus:ring-blue-100"
               />
+
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                aria-label={
+                  showPassword
+                    ? "Sembunyikan password"
+                    : "Tampilkan password"
+                }
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -327,10 +340,16 @@ function SettingsForm({ user }: SettingsFormProps) {
           </div>
 
           <div>
-            <label htmlFor="newPassword" className="mb-2 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="newPassword"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Password Baru
-              <span className="ml-2 font-normal text-gray-400">(Opsional)</span>
+              <span className="ml-2 font-normal text-gray-400">
+                (Opsional)
+              </span>
             </label>
+
             <input
               id="newPassword"
               type="password"
@@ -341,15 +360,20 @@ function SettingsForm({ user }: SettingsFormProps) {
               placeholder="Minimal 8 karakter"
               className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-800 outline-none focus:border-[#0756A5] focus:ring-2 focus:ring-blue-100"
             />
+
             <p className="mt-2 text-xs text-gray-400">
               Kosongkan jika tidak ingin mengganti password.
             </p>
           </div>
 
           {message && (
-            <div className={`rounded-lg px-4 py-3 text-sm ${
-              isSuccess ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-            }`}>
+            <div
+              className={`rounded-lg px-4 py-3 text-sm ${
+                isSuccess
+                  ? "bg-green-50 text-green-700"
+                  : "bg-red-50 text-red-700"
+              }`}
+            >
               {message}
             </div>
           )}
@@ -412,9 +436,13 @@ function SettingsForm({ user }: SettingsFormProps) {
               </div>
 
               <div>
-                <label htmlFor="deletePassword" className="mb-2 block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="deletePassword"
+                  className="mb-2 block text-sm font-medium text-gray-700"
+                >
                   Password Akun
                 </label>
+
                 <input
                   id="deletePassword"
                   type="password"
@@ -438,7 +466,9 @@ function SettingsForm({ user }: SettingsFormProps) {
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
                 >
                   <Trash2 size={17} />
-                  {isDeleting ? "Menghapus..." : "Konfirmasi Hapus Akun"}
+                  {isDeleting
+                    ? "Menghapus..."
+                    : "Konfirmasi Hapus Akun"}
                 </button>
 
                 <button

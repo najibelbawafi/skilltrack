@@ -15,6 +15,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 
+import PageHeader from "@/components/PageHeader";
 import { getRegisteredStudents } from "@/lib/auth";
 import { getStudentProfile } from "@/lib/profile";
 import { getStudentProjects } from "@/lib/projects";
@@ -84,12 +85,15 @@ function StudentDetailContent() {
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-6">
         <div className="max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
           <UserRound className="mx-auto mb-4 text-gray-400" size={42} />
+
           <h1 className="text-xl font-bold text-[#25364A]">
             Profil Tidak Ditemukan
           </h1>
+
           <p className="mt-2 text-sm text-gray-500">
             Profil mungkin tidak tersedia atau sudah diatur menjadi privat.
           </p>
+
           <Link
             href="/directory"
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
@@ -109,21 +113,7 @@ function StudentDetailContent() {
 
   return (
     <main className="min-h-screen bg-[#F4F7FB]">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-          <Link href="/" className="text-2xl font-bold text-[#0756A5]">
-            SkillTrack
-          </Link>
-
-          <Link
-            href="/directory"
-            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-[#0756A5]"
-          >
-            <ArrowLeft size={17} />
-            Direktori Siswa
-          </Link>
-        </div>
-      </header>
+      <PageHeader />
 
       <div className="mx-auto max-w-5xl px-6 py-10">
         <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -211,9 +201,11 @@ function StudentDetailContent() {
             <h3 className="font-semibold text-[#25364A]">
               {profile?.school || "Sekolah belum diisi"}
             </h3>
+
             <p className="mt-1 text-sm text-gray-600">
               {profile?.major || "Jurusan belum diisi"}
             </p>
+
             <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
               <CalendarDays size={14} />
               {profile?.startYear || "-"} – {profile?.graduationYear || "-"}
@@ -237,17 +229,21 @@ function StudentDetailContent() {
                   <h3 className="font-semibold text-[#25364A]">
                     {project.title}
                   </h3>
+
                   <p className="mt-1 text-xs font-medium text-[#0756A5]">
                     {project.category} · {project.year}
                   </p>
+
                   <p className="mt-3 text-sm leading-6 text-gray-600">
                     {project.description}
                   </p>
+
                   {project.technologies && (
                     <p className="mt-3 text-xs text-gray-500">
                       Teknologi: {project.technologies}
                     </p>
                   )}
+
                   {project.link &&
                     /^https?:\/\//i.test(project.link.trim()) && (
                       <a
@@ -295,12 +291,15 @@ function StudentDetailContent() {
                     <h3 className="font-semibold text-[#25364A]">
                       {certificate.title}
                     </h3>
+
                     <p className="mt-1 text-sm text-gray-600">
                       {certificate.issuer}
                     </p>
+
                     <p className="mt-2 text-xs text-gray-500">
                       {certificate.issueDate}
                     </p>
+
                     {certificate.description && (
                       <p className="mt-3 text-sm text-gray-600">
                         {certificate.description}
@@ -343,15 +342,19 @@ function StudentDetailContent() {
                     <h3 className="font-semibold text-[#25364A]">
                       {achievement.title}
                     </h3>
+
                     <p className="mt-1 text-sm text-[#0756A5]">
                       {achievement.category}
                     </p>
+
                     <p className="mt-2 text-sm text-gray-600">
                       {achievement.organizer}
                     </p>
+
                     <p className="mt-2 text-xs text-gray-500">
                       {achievement.date}
                     </p>
+
                     {achievement.description && (
                       <p className="mt-3 text-sm text-gray-600">
                         {achievement.description}

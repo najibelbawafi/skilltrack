@@ -11,6 +11,7 @@ import {
   UserRound,
 } from "lucide-react";
 
+import PageHeader from "@/components/PageHeader";
 import { getRegisteredStudents } from "@/lib/auth";
 import { getStudentProfile } from "@/lib/profile";
 import { getPublicationSettings } from "@/lib/publication";
@@ -71,20 +72,7 @@ export default function DirectoryPage() {
 
   return (
     <main className="min-h-screen bg-[#F4F7FB]">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <Link href="/" className="text-2xl font-bold text-[#0756A5]">
-            SkillTrack
-          </Link>
-
-          <Link
-            href="/"
-            className="text-sm font-medium text-gray-600 transition hover:text-[#0756A5]"
-          >
-            Kembali ke Beranda
-          </Link>
-        </div>
-      </header>
+      <PageHeader />
 
       <section className="mx-auto max-w-7xl px-6 py-12">
         <div className="mb-8">
