@@ -1,9 +1,8 @@
 
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { use, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   UserRound,
@@ -22,6 +21,10 @@ import { getStudentCertificates } from "@/lib/certificates";
 import { getStudentAchievements } from "@/lib/achievements";
 import { getStudentSkills } from "@/lib/skills";
 import { getCVPublicationSettings } from "@/lib/cv-publication";
+
+type PublicCVPageProps = {
+  params: Promise<{ id: string }>;
+};
 
 type CVTheme =
   | "formal"
@@ -150,6 +153,18 @@ function getSnapshot() {
   }
 }
 
+function getThemeSnapshot(studentId: string) {
+  if (typeof window === "undefined") return "";
+
+  try {
+    return (
+      localStorage.getItem(`skilltrack_cv_theme_${studentId}`) ?? ""
+    );
+  } catch {
+    return "";
+  }
+}
+
 function getServerSnapshot() {
   return "";
 }
@@ -207,13 +222,20 @@ function NotAvailablePage() {
   );
 }
 
-export default function PublicCVPage() {
-  const params = useParams<{ id: string }>();
-  const studentId = params.id;
+export default function PublicCVPage({
+  params,
+}: PublicCVPageProps) {
+  const { id: studentId } = use(params);
 
   useSyncExternalStore(
     subscribe,
     getSnapshot,
+    getServerSnapshot
+  );
+
+  const savedTheme = useSyncExternalStore(
+    subscribe,
+    () => getThemeSnapshot(studentId),
     getServerSnapshot
   );
 
@@ -236,10 +258,6 @@ export default function PublicCVPage() {
   const certificates = getStudentCertificates(studentId);
   const achievements = getStudentAchievements(studentId);
   const skills = getStudentSkills(studentId);
-
-  const savedTheme = localStorage.getItem(
-    `skilltrack_cv_theme_${studentId}`
-  );
 
   const selectedTheme = isCVTheme(savedTheme)
     ? savedTheme
