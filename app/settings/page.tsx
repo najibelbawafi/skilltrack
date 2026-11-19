@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -21,54 +21,18 @@ import {
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
+import { useAuth } from "@/app/providers";
+import { supabase } from "@/lib/supabase";
 
-import {
-  getCurrentUser,
-  updateUserAccount,
-  deleteUserAccount,
-} from "@/lib/auth";
-
-import {
-  getPublicationSettings,
-  savePublicationSettings,
-} from "@/lib/publication";
-
-function subscribeAuth(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
-
-function getAuthSnapshot() {
-  return localStorage.getItem("skilltrack_current_user");
-}
-
-function getAuthServerSnapshot() {
-  return undefined;
-}
-
-function subscribePublication(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener("skilltrack-publication", callback);
-
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener("skilltrack-publication", callback);
+function SettingsForm({
+  user,
+}: {
+  user: {
+    id: string;
+    name: string;
+    email: string;
   };
-}
-
-function getPublicationSnapshot(userId: string) {
-  return getPublicationSettings(userId).isPublic;
-}
-
-function getPublicationServerSnapshot() {
-  return false;
-}
-
-type SettingsFormProps = {
-  user: NonNullable<ReturnType<typeof getCurrentUser>>;
-};
-
-function SettingsForm({ user }: SettingsFormProps) {
+}) {
   const router = useRouter();
 
   const [name, setName] = useState(user.name);
@@ -76,83 +40,215 @@ function SettingsForm({ user }: SettingsFormProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [deletePassword, setDeletePassword] = useState("");
-  const [deleteMessage, setDeleteMessage] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
+  const [publicationLoaded, setPublicationLoaded] = useState(false);
+  const [publicationSaving, setPublicationSaving] = useState(false);
+  const [publicationMessage, setPublicationMessage] = useState("");
 
-  const isPublic = useSyncExternalStore(
-    subscribePublication,
-    () => getPublicationSnapshot(user.id),
-    getPublicationServerSnapshot
-  );
+  useEffect(() => {
+    let mounted = true;
 
-  function handlePublicationToggle() {
-    savePublicationSettings(user.id, !isPublic);
-    window.dispatchEvent(new Event("skilltrack-publication"));
+    async function loadPublicationSettings() {
+      try {
+        const { data, error } = await supabase
+          .from("publication_settings")
+          .select("is_public")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (mounted) {
+          setIsPublic(data?.is_public ?? false);
+        }
+      } catch (error) {
+        console.error("Gagal memuat publikasi:", error);
+
+        if (mounted) {
+          setPublicationMessage(
+            "Pengaturan publikasi gagal dimuat."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setPublicationLoaded(true);
+        }
+      }
+    }
+
+    loadPublicationSettings();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user.id]);
+
+  async function handlePublicationToggle() {
+    if (publicationSaving) return;
+
+    setPublicationSaving(true);
+    setPublicationMessage("");
+
+    const nextValue = !isPublic;
+
+    try {
+      const { error } = await supabase
+        .from("publication_settings")
+        .upsert(
+          {
+            user_id: user.id,
+            is_public: nextValue,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id",
+          }
+        );
+
+      if (error) throw error;
+
+      setIsPublic(nextValue);
+    } catch (error) {
+      console.error("Gagal menyimpan publikasi:", error);
+
+      setPublicationMessage(
+        "Gagal menyimpan perubahan publikasi."
+      );
+    } finally {
+      setPublicationSaving(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setMessage("");
+    setIsSuccess(false);
+
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedName || !normalizedEmail) {
+      setMessage("Nama dan email wajib diisi.");
+      return;
+    }
+
+    if (!currentPassword) {
+      setMessage("Masukkan password saat ini untuk konfirmasi.");
+      return;
+    }
+
+    if (newPassword && newPassword.length < 8) {
+      setMessage("Password baru minimal 8 karakter.");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
-      const result = await updateUserAccount(
-        user.id,
-        name,
-        email,
-        currentPassword,
-        newPassword || undefined
+      // Verifikasi password akun yang sedang digunakan.
+      const { error: verificationError } =
+        await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: currentPassword,
+        });
+
+      if (verificationError) {
+        throw new Error("Password saat ini tidak sesuai.");
+      }
+
+      const updateData: {
+        data: { full_name: string };
+        email?: string;
+        password?: string;
+      } = {
+        data: {
+          full_name: normalizedName,
+        },
+      };
+
+      const emailChanged =
+        normalizedEmail !== user.email.toLowerCase();
+
+      if (emailChanged) {
+        updateData.email = normalizedEmail;
+      }
+
+      if (newPassword) {
+        updateData.password = newPassword;
+      }
+
+      const { error: updateError } =
+        await supabase.auth.updateUser(updateData);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Sinkronkan nama ke tabel profil Supabase.
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          full_name: normalizedName,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (profileError) {
+        console.error(
+          "Nama Auth berhasil diperbarui, tetapi profil gagal diperbarui:",
+          profileError
+        );
+
+        setMessage(
+          "Informasi akun berhasil diperbarui, tetapi sinkronisasi nama profil gagal."
+        );
+        setIsSuccess(false);
+      } else if (emailChanged) {
+        setMessage(
+          "Nama akun berhasil diperbarui. Periksa email baru untuk menyelesaikan konfirmasi perubahan alamat email."
+        );
+        setIsSuccess(true);
+      } else {
+        setMessage("Pengaturan akun berhasil diperbarui.");
+        setIsSuccess(true);
+      }
+
+      setName(normalizedName);
+      setEmail(normalizedEmail);
+      setCurrentPassword("");
+      setNewPassword("");
+    } catch (error) {
+      console.error("Gagal memperbarui akun:", error);
+
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat menyimpan pengaturan."
       );
 
-      setMessage(result.message);
-      setIsSuccess(result.success);
-
-      if (result.success) {
-        setName(name.trim());
-        setEmail(email.trim().toLowerCase());
-        setCurrentPassword("");
-        setNewPassword("");
-      }
-    } catch {
-      setMessage("Terjadi kesalahan saat menyimpan pengaturan.");
       setIsSuccess(false);
     } finally {
       setIsSaving(false);
     }
   }
 
-  async function handleDeleteAccount(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!showDeleteConfirmation) {
-      setShowDeleteConfirmation(true);
-      return;
-    }
-
-    setDeleteMessage("");
-    setIsDeleting(true);
-
-    try {
-      const result = await deleteUserAccount(user.id, deletePassword);
-
-      setDeleteMessage(result.message);
-
-      if (result.success) {
-        window.dispatchEvent(new Event("storage"));
-        router.replace("/login");
-      }
-    } catch {
-      setDeleteMessage("Terjadi kesalahan saat menghapus akun.");
-    } finally {
-      setIsDeleting(false);
-    }
+  if (!publicationLoaded) {
+    return (
+      <main className="min-h-screen bg-[#F4F7FB]">
+        <PageHeader />
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <p className="text-sm text-gray-500">
+            Memuat pengaturan...
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -204,6 +300,7 @@ function SettingsForm({ user }: SettingsFormProps) {
                 <p className="font-semibold text-[#25364A]">
                   {isPublic ? "Portofolio Publik" : "Portofolio Privat"}
                 </p>
+
                 <p className="mt-1 text-xs text-gray-500">
                   {isPublic
                     ? "Profilmu dapat ditemukan di Direktori Siswa."
@@ -215,15 +312,26 @@ function SettingsForm({ user }: SettingsFormProps) {
             <button
               type="button"
               onClick={handlePublicationToggle}
-              className={`rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition ${
+              disabled={publicationSaving}
+              className={`rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 isPublic
                   ? "bg-red-600 hover:bg-red-700"
                   : "bg-[#0756A5] hover:bg-blue-800"
               }`}
             >
-              {isPublic ? "Jadikan Privat" : "Jadikan Publik"}
+              {publicationSaving
+                ? "Menyimpan..."
+                : isPublic
+                  ? "Jadikan Privat"
+                  : "Jadikan Publik"}
             </button>
           </div>
+
+          {publicationMessage && (
+            <p className="mt-3 text-sm text-red-600">
+              {publicationMessage}
+            </p>
+          )}
 
           <p className="mt-4 text-xs text-gray-400">
             Pengaturan ini juga berlaku pada fitur publikasi di halaman
@@ -257,6 +365,7 @@ function SettingsForm({ user }: SettingsFormProps) {
                 size={18}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               />
+
               <input
                 id="name"
                 type="text"
@@ -281,6 +390,7 @@ function SettingsForm({ user }: SettingsFormProps) {
                 size={18}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               />
+
               <input
                 id="email"
                 type="email"
@@ -314,12 +424,16 @@ function SettingsForm({ user }: SettingsFormProps) {
                 size={18}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               />
+
               <input
                 id="currentPassword"
                 type={showPassword ? "text" : "password"}
                 value={currentPassword}
-                onChange={(event) => setCurrentPassword(event.target.value)}
+                onChange={(event) =>
+                  setCurrentPassword(event.target.value)
+                }
                 required
+                autoComplete="current-password"
                 placeholder="Masukkan password saat ini"
                 className="w-full rounded-lg border border-gray-300 py-3 pl-10 pr-12 text-sm text-gray-800 outline-none focus:border-[#0756A5] focus:ring-2 focus:ring-blue-100"
               />
@@ -334,7 +448,11 @@ function SettingsForm({ user }: SettingsFormProps) {
                     : "Tampilkan password"
                 }
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? (
+                  <EyeOff size={18} />
+                ) : (
+                  <Eye size={18} />
+                )}
               </button>
             </div>
           </div>
@@ -407,6 +525,7 @@ function SettingsForm({ user }: SettingsFormProps) {
               <h2 className="text-lg font-bold text-red-700">
                 Hapus Akun
               </h2>
+
               <p className="mt-1 text-sm text-gray-500">
                 Penghapusan akun akan menghapus data profil, proyek,
                 sertifikat, pencapaian, dan pengaturan publikasi akun ini.
@@ -414,77 +533,26 @@ function SettingsForm({ user }: SettingsFormProps) {
             </div>
           </div>
 
-          {!showDeleteConfirmation ? (
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirmation(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-red-300 px-5 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-            >
-              <Trash2 size={17} />
-              Hapus Akun Saya
-            </button>
-          ) : (
-            <form onSubmit={handleDeleteAccount} className="space-y-4">
-              <div className="rounded-lg bg-red-50 p-4">
-                <p className="text-sm font-semibold text-red-700">
-                  Apakah kamu yakin ingin menghapus akun?
-                </p>
-                <p className="mt-1 text-xs text-red-600">
-                  Tindakan ini tidak dapat dibatalkan. Masukkan password
-                  akun untuk melanjutkan.
-                </p>
-              </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-800">
+              Penghapusan akun sementara belum tersedia.
+            </p>
 
-              <div>
-                <label
-                  htmlFor="deletePassword"
-                  className="mb-2 block text-sm font-medium text-gray-700"
-                >
-                  Password Akun
-                </label>
+            <p className="mt-1 text-xs leading-5 text-amber-700">
+              Fitur ini membutuhkan proses penghapusan yang aman melalui
+              backend Supabase. Akun dan data tidak akan dihapus dari
+              browser secara langsung.
+            </p>
+          </div>
 
-                <input
-                  id="deletePassword"
-                  type="password"
-                  value={deletePassword}
-                  onChange={(event) => setDeletePassword(event.target.value)}
-                  required
-                  autoComplete="current-password"
-                  placeholder="Masukkan password akun"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-800 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
-                />
-              </div>
-
-              {deleteMessage && (
-                <p className="text-sm text-red-600">{deleteMessage}</p>
-              )}
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="submit"
-                  disabled={isDeleting}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
-                >
-                  <Trash2 size={17} />
-                  {isDeleting
-                    ? "Menghapus..."
-                    : "Konfirmasi Hapus Akun"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDeleteConfirmation(false);
-                    setDeletePassword("");
-                    setDeleteMessage("");
-                  }}
-                  className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                >
-                  Batal
-                </button>
-              </div>
-            </form>
-          )}
+          <button
+            type="button"
+            disabled
+            className="mt-4 inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-400"
+          >
+            <Trash2 size={17} />
+            Hapus Akun Saya
+          </button>
         </div>
       </section>
     </main>
@@ -492,29 +560,33 @@ function SettingsForm({ user }: SettingsFormProps) {
 }
 
 export default function SettingsPage() {
+  const { user, loading } = useAuth();
   const router = useRouter();
 
-  const userId = useSyncExternalStore(
-    subscribeAuth,
-    getAuthSnapshot,
-    getAuthServerSnapshot
-  );
-
-  const user = userId ? getCurrentUser() : null;
-
   useEffect(() => {
-    if (userId === null || (userId && !getCurrentUser())) {
+    if (!loading && !user) {
       router.replace("/login");
     }
-  }, [userId, router]);
+  }, [loading, user, router]);
 
-  if (userId === undefined || userId === null || !user) {
+  if (loading || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <p className="text-sm text-gray-500">Memuat pengaturan...</p>
+        <p className="text-sm text-gray-500">
+          Memuat pengaturan...
+        </p>
       </main>
     );
   }
 
-  return <SettingsForm key={user.id} user={user} />;
+  return (
+    <SettingsForm
+      key={user.id}
+      user={{
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      }}
+    />
+  );
 }

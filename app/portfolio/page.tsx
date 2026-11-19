@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -21,15 +21,8 @@ import {
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
-import { getCurrentUser } from "@/lib/auth";
-import { getStudentProfile } from "@/lib/profile";
-import { getStudentProjects } from "@/lib/projects";
-import { getStudentCertificates } from "@/lib/certificates";
-import { getStudentAchievements } from "@/lib/achievements";
-import {
-  getPublicationSettings,
-  savePublicationSettings,
-} from "@/lib/publication";
+import { useAuth } from "@/app/providers";
+import { supabase } from "@/lib/supabase";
 
 type PortfolioTheme =
   | "formal"
@@ -40,6 +33,52 @@ type PortfolioTheme =
   | "technical"
   | "two-column"
   | "monochrome";
+
+type PortfolioProfile = {
+  fullName: string;
+  email: string;
+  phone: string;
+  birthPlace: string;
+  birthDate: string;
+  gender: string;
+  address: string;
+  bio: string;
+  major: string;
+  school: string;
+  startYear: string;
+  graduationYear: string;
+  photoUrl: string;
+};
+
+type PortfolioProject = {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  technologies: string;
+  year: string;
+  link: string;
+};
+
+type PortfolioCertificate = {
+  id: string;
+  title: string;
+  issuer: string;
+  issueDate: string;
+  description: string;
+  credentialUrl: string;
+  imageDataUrl: string;
+};
+
+type PortfolioAchievement = {
+  id: string;
+  title: string;
+  category: string;
+  organizer: string;
+  date: string;
+  description: string;
+  imageDataUrl: string;
+};
 
 const portfolioThemes: {
   id: PortfolioTheme;
@@ -219,36 +258,10 @@ const themeStyles: Record<
   },
 };
 
-function isPortfolioTheme(value: string | null): value is PortfolioTheme {
+function isPortfolioTheme(
+  value: string | null
+): value is PortfolioTheme {
   return portfolioThemes.some((theme) => theme.id === value);
-}
-
-function subscribeToAuth(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
-
-function getAuthSnapshot() {
-  return localStorage.getItem("skilltrack_current_user");
-}
-
-function getServerAuthSnapshot() {
-  return undefined;
-}
-
-function subscribeToPublication(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener("skilltrack-publication", callback);
-
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener("skilltrack-publication", callback);
-  };
-}
-
-function getPublicationSnapshot(userId: string | null | undefined) {
-  if (!userId) return false;
-  return getPublicationSettings(userId).isPublic;
 }
 
 function getSafeExternalUrl(value: string) {
@@ -283,50 +296,228 @@ function formatDate(value: string) {
 
 export default function PortfolioPage() {
   const router = useRouter();
+  const { user, loading } = useAuth();
 
-  const userId = useSyncExternalStore(
-    subscribeToAuth,
-    getAuthSnapshot,
-    getServerAuthSnapshot
-  );
-
-  const isPublic = useSyncExternalStore(
-    subscribeToPublication,
-    () => getPublicationSnapshot(userId),
-    () => false
-  );
+  const userId = user?.id ?? null;
 
   const [selectedTheme, setSelectedTheme] =
     useState<PortfolioTheme>("formal");
 
   const [themeLoaded, setThemeLoaded] = useState(false);
 
-  const user = userId ? getCurrentUser() : null;
-  const profile = userId ? getStudentProfile(userId) : null;
-  const projects = userId ? getStudentProjects(userId) : [];
-  const certificates = userId ? getStudentCertificates(userId) : [];
-  const achievements = userId ? getStudentAchievements(userId) : [];
+  const [profile, setProfile] =
+    useState<PortfolioProfile | null>(null);
+
+  const [projects, setProjects] = useState<PortfolioProject[]>([]);
+  const [certificates, setCertificates] =
+    useState<PortfolioCertificate[]>([]);
+  const [achievements, setAchievements] =
+    useState<PortfolioAchievement[]>([]);
+
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [dataError, setDataError] = useState("");
+
+  const [isPublic, setIsPublic] = useState(false);
+  const [publicationLoaded, setPublicationLoaded] = useState(false);
+  const [publicationSaving, setPublicationSaving] = useState(false);
+  const [publicationError, setPublicationError] = useState("");
 
   useEffect(() => {
-    if (userId === null || (userId && !user)) {
+    if (!loading && !user) {
       router.replace("/login");
     }
-  }, [userId, user, router]);
+  }, [loading, user, router]);
 
   useEffect(() => {
     if (!userId) return;
 
-    const savedTheme = localStorage.getItem(
-      `skilltrack_portfolio_theme_${userId}`
-    );
+    try {
+      const savedTheme = localStorage.getItem(
+        `skilltrack_portfolio_theme_${userId}`
+      );
 
-    if (isPortfolioTheme(savedTheme)) {
-      setSelectedTheme(savedTheme);
-    } else {
+      if (isPortfolioTheme(savedTheme)) {
+        setSelectedTheme(savedTheme);
+      } else {
+        setSelectedTheme("formal");
+      }
+    } catch {
       setSelectedTheme("formal");
     }
 
     setThemeLoaded(true);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !user) return;
+
+    let mounted = true;
+
+    const currentUser = user;
+
+async function loadPortfolioData() {
+      setDataLoaded(false);
+      setDataError("");
+
+      try {
+        const [
+          profileResult,
+          projectsResult,
+          certificatesResult,
+          achievementsResult,
+        ] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", userId)
+            .maybeSingle(),
+
+          supabase
+            .from("projects")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false }),
+
+          supabase
+            .from("certificates")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false }),
+
+          supabase
+            .from("achievements")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false }),
+        ]);
+
+        if (profileResult.error) throw profileResult.error;
+        if (projectsResult.error) throw projectsResult.error;
+        if (certificatesResult.error) throw certificatesResult.error;
+        if (achievementsResult.error) throw achievementsResult.error;
+
+        if (!mounted) return;
+
+        const profileData = profileResult.data;
+
+        setProfile(
+          profileData
+            ? {
+                fullName: profileData.full_name ?? currentUser.name,
+                email: currentUser.email,
+                phone: profileData.phone ?? "",
+                birthPlace: profileData.birth_place ?? "",
+                birthDate: profileData.birth_date ?? "",
+                gender: profileData.gender ?? "",
+                address: profileData.address ?? "",
+                bio: profileData.bio ?? "",
+                major: profileData.major ?? "",
+                school: profileData.school ?? "",
+                startYear: profileData.start_year ?? "",
+                graduationYear: profileData.graduation_year ?? "",
+                photoUrl: profileData.photo_url ?? "",
+              }
+            : null
+        );
+
+        setProjects(
+          (projectsResult.data ?? []).map((row) => ({
+            id: row.id,
+            title: row.title ?? "",
+            category: row.category ?? "",
+            description: row.description ?? "",
+            technologies: row.technologies ?? "",
+            year: row.year ?? "",
+            link: row.link ?? "",
+          }))
+        );
+
+        setCertificates(
+          (certificatesResult.data ?? []).map((row) => ({
+            id: row.id,
+            title: row.title ?? "",
+            issuer: row.issuer ?? "",
+            issueDate: row.issue_date ?? "",
+            description: row.description ?? "",
+            credentialUrl: row.credential_url ?? "",
+            imageDataUrl: row.image_url ?? "",
+          }))
+        );
+
+        setAchievements(
+          (achievementsResult.data ?? []).map((row) => ({
+            id: row.id,
+            title: row.title ?? "",
+            category: row.category ?? "",
+            organizer: row.organizer ?? "",
+            date: row.date ?? "",
+            description: row.description ?? "",
+            imageDataUrl: row.image_url ?? "",
+          }))
+        );
+      } catch (error) {
+        console.error("Gagal mengambil data portofolio:", error);
+
+        if (mounted) {
+          setDataError(
+            "Data portofolio gagal dimuat. Silakan muat ulang halaman."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setDataLoaded(true);
+        }
+      }
+    }
+
+    loadPortfolioData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [userId, user]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    let mounted = true;
+
+    async function loadPublicationSettings() {
+      try {
+        const { data, error } = await supabase
+          .from("publication_settings")
+          .select("is_public")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (mounted) {
+          setIsPublic(data?.is_public ?? false);
+        }
+      } catch (error) {
+        console.error(
+          "Gagal mengambil pengaturan publikasi:",
+          error
+        );
+
+        if (mounted) {
+          setPublicationError(
+            "Pengaturan publikasi gagal dimuat."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setPublicationLoaded(true);
+        }
+      }
+    }
+
+    loadPublicationSettings();
+
+    return () => {
+      mounted = false;
+    };
   }, [userId]);
 
   function handleThemeChange(theme: PortfolioTheme) {
@@ -340,19 +531,79 @@ export default function PortfolioPage() {
     );
   }
 
-  function handlePublicationToggle() {
-    if (!userId) return;
+  async function handlePublicationToggle() {
+    if (!userId || publicationSaving) return;
 
-    savePublicationSettings(userId, !isPublic);
-    window.dispatchEvent(new Event("skilltrack-publication"));
+    const nextValue = !isPublic;
+
+    setPublicationSaving(true);
+    setPublicationError("");
+
+    try {
+      const { error } = await supabase
+        .from("publication_settings")
+        .upsert(
+          {
+            user_id: userId,
+            is_public: nextValue,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id",
+          }
+        );
+
+      if (error) throw error;
+
+      setIsPublic(nextValue);
+    } catch (error) {
+      console.error(
+        "Gagal menyimpan pengaturan publikasi:",
+        error
+      );
+
+      setPublicationError(
+        "Gagal menyimpan perubahan. Silakan coba kembali."
+      );
+    } finally {
+      setPublicationSaving(false);
+    }
   }
 
-  if (userId === undefined || userId === null || !user || !themeLoaded) {
+  if (
+    loading ||
+    !user ||
+    !themeLoaded ||
+    !dataLoaded ||
+    !publicationLoaded
+  ) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
         <p className="text-sm text-gray-500">
           Memuat portofolio...
         </p>
+      </main>
+    );
+  }
+
+  if (dataError) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-4">
+        <div className="max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
+          <p className="font-semibold text-red-700">
+            Gagal memuat portofolio
+          </p>
+          <p className="mt-2 text-sm text-gray-600">
+            {dataError}
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-5 rounded-xl bg-[#0756A5] px-5 py-2.5 text-sm font-semibold text-white"
+          >
+            Muat Ulang
+          </button>
+        </div>
       </main>
     );
   }
@@ -368,7 +619,9 @@ export default function PortfolioPage() {
       <main className={`min-h-screen px-4 py-8 md:px-8 ${style.page}`}>
         <div className="mx-auto max-w-5xl">
           <div className="mb-6 flex justify-end">
-            <span className={`rounded-full px-4 py-2 text-xs font-semibold ${style.badge}`}>
+            <span
+              className={`rounded-full px-4 py-2 text-xs font-semibold ${style.badge}`}
+            >
               PREVIEW PORTOFOLIO
             </span>
           </div>
@@ -459,26 +712,39 @@ export default function PortfolioPage() {
               <button
                 type="button"
                 onClick={handlePublicationToggle}
-                className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
+                disabled={publicationSaving}
+                className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
                   isPublic
                     ? "bg-gray-600 hover:bg-gray-700"
                     : "bg-[#0756A5] hover:bg-blue-800"
                 }`}
               >
-                {isPublic ? "Jadikan Privat" : "Publikasikan Portofolio"}
+                {publicationSaving
+                  ? "Menyimpan..."
+                  : isPublic
+                    ? "Jadikan Privat"
+                    : "Publikasikan Portofolio"}
               </button>
             </div>
 
+            {publicationError && (
+              <p className="mt-3 text-sm text-red-600">
+                {publicationError}
+              </p>
+            )}
+
             <p className="mt-4 border-t border-gray-100 pt-4 text-xs leading-5 text-gray-500">
-              Pengaturan publikasi menggunakan LocalStorage. Informasi
-              kontak pribadi hanya ditampilkan pada preview pemilik akun,
+              Status publikasi tersimpan di Supabase. Informasi kontak
+              pribadi hanya ditampilkan pada preview pemilik akun,
               bukan pada halaman publik Direktori Siswa.
             </p>
           </section>
 
           <section className={`overflow-hidden ${style.sheet}`}>
             <div className={`px-6 py-10 md:px-10 ${style.hero}`}>
-              <p className={`text-sm font-medium tracking-wider ${style.secondaryText}`}>
+              <p
+                className={`text-sm font-medium tracking-wider ${style.secondaryText}`}
+              >
                 STUDENT DIGITAL PORTFOLIO
               </p>
 
@@ -490,13 +756,17 @@ export default function PortfolioPage() {
                     className="h-28 w-28 rounded-full border-4 border-white/80 object-cover"
                   />
                 ) : (
-                  <div className={`flex h-28 w-28 items-center justify-center rounded-full border-4 border-white/80 bg-white text-4xl font-bold ${style.accent}`}>
+                  <div
+                    className={`flex h-28 w-28 items-center justify-center rounded-full border-4 border-white/80 bg-white text-4xl font-bold ${style.accent}`}
+                  >
                     {initial}
                   </div>
                 )}
 
                 <div>
-                  <h1 className={`text-3xl font-bold md:text-4xl ${style.heroText}`}>
+                  <h1
+                    className={`text-3xl font-bold md:text-4xl ${style.heroText}`}
+                  >
                     {fullName}
                   </h1>
 
@@ -514,7 +784,9 @@ export default function PortfolioPage() {
             <div className="grid gap-8 p-6 md:grid-cols-[1fr_2fr] md:p-10">
               <aside className="space-y-7">
                 <section>
-                  <h2 className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}>
+                  <h2
+                    className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}
+                  >
                     <User size={19} className={style.accent} />
                     Tentang Saya
                   </h2>
@@ -531,20 +803,29 @@ export default function PortfolioPage() {
 
                   <div className="mt-4 space-y-3 text-sm text-gray-600">
                     <p className="flex items-start gap-2 break-all">
-                      <Mail size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
+                      <Mail
+                        size={17}
+                        className={`mt-0.5 shrink-0 ${style.accent}`}
+                      />
                       {profile?.email || user.email}
                     </p>
 
                     {profile?.phone && (
                       <p className="flex items-start gap-2">
-                        <Phone size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
+                        <Phone
+                          size={17}
+                          className={`mt-0.5 shrink-0 ${style.accent}`}
+                        />
                         {profile.phone}
                       </p>
                     )}
 
                     {profile?.address && (
                       <p className="flex items-start gap-2">
-                        <MapPin size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
+                        <MapPin
+                          size={17}
+                          className={`mt-0.5 shrink-0 ${style.accent}`}
+                        />
                         {profile.address}
                       </p>
                     )}
@@ -552,7 +833,9 @@ export default function PortfolioPage() {
                 </section>
 
                 <section>
-                  <h2 className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}>
+                  <h2
+                    className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}
+                  >
                     <GraduationCap size={19} className={style.accent} />
                     Pendidikan
                   </h2>
@@ -567,7 +850,8 @@ export default function PortfolioPage() {
                     </p>
 
                     <p className="mt-2 text-xs text-gray-500">
-                      {profile?.startYear || "-"} – {profile?.graduationYear || "-"}
+                      {profile?.startYear || "-"} –{" "}
+                      {profile?.graduationYear || "-"}
                     </p>
                   </div>
                 </section>
@@ -575,17 +859,23 @@ export default function PortfolioPage() {
 
               <div className="space-y-8">
                 <section>
-                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
+                  <h2
+                    className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}
+                  >
                     <FolderKanban size={20} className={style.accent} />
                     Proyek Saya
-                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
+                    <span
+                      className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}
+                    >
                       {projects.length} proyek
                     </span>
                   </h2>
 
                   <div className="mt-4 space-y-3">
                     {projects.length === 0 ? (
-                      <p className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}>
+                      <p
+                        className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}
+                      >
                         Belum ada proyek yang ditambahkan.
                       </p>
                     ) : (
@@ -593,13 +883,20 @@ export default function PortfolioPage() {
                         const safeUrl = getSafeExternalUrl(project.link);
 
                         return (
-                          <article key={project.id} className={`p-4 ${style.card}`}>
+                          <article
+                            key={project.id}
+                            className={`p-4 ${style.card}`}
+                          >
                             <div className="flex flex-wrap items-start justify-between gap-2">
-                              <h3 className={`font-semibold ${style.sectionTitle}`}>
+                              <h3
+                                className={`font-semibold ${style.sectionTitle}`}
+                              >
                                 {project.title}
                               </h3>
 
-                              <span className={`rounded-full px-3 py-1 text-xs ${style.badge}`}>
+                              <span
+                                className={`rounded-full px-3 py-1 text-xs ${style.badge}`}
+                              >
                                 {project.category}
                               </span>
                             </div>
@@ -618,8 +915,8 @@ export default function PortfolioPage() {
                               Tahun: {project.year || "-"}
                             </p>
 
-                            {project.link && (
-                              safeUrl ? (
+                            {project.link &&
+                              (safeUrl ? (
                                 <a
                                   href={safeUrl}
                                   target="_blank"
@@ -633,8 +930,7 @@ export default function PortfolioPage() {
                                 <p className="mt-3 text-xs text-red-600">
                                   Link proyek tidak valid.
                                 </p>
-                              )
-                            )}
+                              ))}
                           </article>
                         );
                       })
@@ -643,17 +939,23 @@ export default function PortfolioPage() {
                 </section>
 
                 <section>
-                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
+                  <h2
+                    className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}
+                  >
                     <Award size={20} className={style.accent} />
                     Sertifikat
-                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
+                    <span
+                      className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}
+                    >
                       {certificates.length} sertifikat
                     </span>
                   </h2>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {certificates.length === 0 ? (
-                      <p className={`p-4 text-sm text-gray-500 sm:col-span-2 ${style.soft} ${style.card}`}>
+                      <p
+                        className={`p-4 text-sm text-gray-500 sm:col-span-2 ${style.soft} ${style.card}`}
+                      >
                         Belum ada sertifikat yang ditambahkan.
                       </p>
                     ) : (
@@ -676,7 +978,9 @@ export default function PortfolioPage() {
                             )}
 
                             <div className="p-4">
-                              <h3 className={`font-semibold ${style.sectionTitle}`}>
+                              <h3
+                                className={`font-semibold ${style.sectionTitle}`}
+                              >
                                 {certificate.title}
                               </h3>
 
@@ -689,8 +993,8 @@ export default function PortfolioPage() {
                                 {formatDate(certificate.issueDate)}
                               </p>
 
-                              {certificate.credentialUrl && (
-                                safeUrl ? (
+                              {certificate.credentialUrl &&
+                                (safeUrl ? (
                                   <a
                                     href={safeUrl}
                                     target="_blank"
@@ -704,8 +1008,7 @@ export default function PortfolioPage() {
                                   <p className="mt-3 text-xs text-red-600">
                                     Link sertifikat tidak valid.
                                   </p>
-                                )
-                              )}
+                                ))}
                             </div>
                           </article>
                         );
@@ -715,17 +1018,23 @@ export default function PortfolioPage() {
                 </section>
 
                 <section>
-                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
+                  <h2
+                    className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}
+                  >
                     <Trophy size={20} className={style.accent} />
                     Pencapaian
-                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
+                    <span
+                      className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}
+                    >
                       {achievements.length} pencapaian
                     </span>
                   </h2>
 
                   <div className="mt-4 space-y-3">
                     {achievements.length === 0 ? (
-                      <p className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}>
+                      <p
+                        className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}
+                      >
                         Belum ada pencapaian yang ditambahkan.
                       </p>
                     ) : (
@@ -744,7 +1053,9 @@ export default function PortfolioPage() {
 
                           <div className="flex-1 p-4">
                             <div className="flex flex-wrap items-start justify-between gap-2">
-                              <h3 className={`font-semibold ${style.sectionTitle}`}>
+                              <h3
+                                className={`font-semibold ${style.sectionTitle}`}
+                              >
                                 {achievement.title}
                               </h3>
 

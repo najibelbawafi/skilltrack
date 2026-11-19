@@ -4,22 +4,21 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { registerUser } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 export default function RegisterPage() {
-  const router = useRouter();
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleRegister(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+    setSuccess("");
 
     if (!name.trim() || !email.trim() || !password || !confirmPassword) {
       setError("Semua kolom wajib diisi.");
@@ -39,16 +38,41 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const result = await registerUser(name, email, password);
+      const { data, error: registerError } =
+        await supabase.auth.signUp({
+          email: email.trim().toLowerCase(),
+          password,
+          options: {
+            data: {
+              full_name: name.trim(),
+            },
+            emailRedirectTo: `${window.location.origin}/login`,
+          },
+        });
 
-      if (!result.success) {
-        setError(result.message);
+      if (registerError) {
+        if (
+          registerError.message.toLowerCase().includes("already registered")
+        ) {
+          setError("Email ini sudah terdaftar. Silakan login.");
+        } else {
+          setError(registerError.message);
+        }
         return;
       }
 
-      router.push("/login");
+      if (data.user) {
+        setSuccess(
+          "Pendaftaran berhasil. Silakan periksa email kamu dan klik tautan verifikasi sebelum login ke SkillTrack."
+        );
+
+        setName("");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+      }
     } catch {
-      setError("Pendaftaran gagal. Silakan coba lagi.");
+      setError("Pendaftaran gagal. Periksa koneksi internet dan coba lagi.");
     } finally {
       setLoading(false);
     }
@@ -84,6 +108,7 @@ export default function RegisterPage() {
               className={inputClass}
               placeholder="Masukkan nama lengkap"
               autoComplete="name"
+              required
             />
           </div>
 
@@ -98,6 +123,7 @@ export default function RegisterPage() {
               className={inputClass}
               placeholder="nama@email.com"
               autoComplete="email"
+              required
             />
           </div>
 
@@ -112,6 +138,7 @@ export default function RegisterPage() {
               className={inputClass}
               placeholder="Minimal 8 karakter"
               autoComplete="new-password"
+              required
             />
           </div>
 
@@ -126,13 +153,20 @@ export default function RegisterPage() {
               className={inputClass}
               placeholder="Ulangi password"
               autoComplete="new-password"
+              required
             />
           </div>
 
           {error && (
-            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+            <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
               {error}
             </p>
+          )}
+
+          {success && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm leading-relaxed text-green-700">
+              {success}
+            </div>
           )}
 
           <button

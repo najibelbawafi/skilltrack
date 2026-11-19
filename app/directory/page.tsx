@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -13,62 +13,70 @@ import {
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
-import { getRegisteredStudents } from "@/lib/auth";
-import { getStudentProfile } from "@/lib/profile";
-import { getPublicationSettings } from "@/lib/publication";
+import { supabase } from "@/lib/supabase";
 
-function subscribeToDirectory(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener("skilltrack-publication", callback);
-
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener("skilltrack-publication", callback);
-  };
-}
-
-function getDirectorySnapshot() {
-  if (typeof window === "undefined") return "";
-
-  try {
-    return [
-      localStorage.getItem("skilltrack_users") ?? "",
-      localStorage.getItem("skilltrack_publication") ?? "",
-      localStorage.getItem("skilltrack_profiles") ?? "",
-    ].join("|");
-  } catch {
-    return "";
-  }
-}
-
-function getServerSnapshot() {
-  return "";
-}
+type PublicStudent = {
+  id: string;
+  full_name: string;
+  major: string;
+  school: string;
+  photo_url: string;
+};
 
 export default function DirectoryPage() {
   const [search, setSearch] = useState("");
+  const [publicStudents, setPublicStudents] = useState<PublicStudent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  useSyncExternalStore(
-    subscribeToDirectory,
-    getDirectorySnapshot,
-    getServerSnapshot
-  );
+  useEffect(() => {
+    let mounted = true;
 
-  const publicStudents = getRegisteredStudents()
-    .filter((student) => getPublicationSettings(student.id).isPublic)
-    .map((student) => ({
-      ...student,
-      profile: getStudentProfile(student.id),
-    }));
+    async function loadPublicStudents() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const { data, error: fetchError } = await supabase.rpc(
+          "get_public_students"
+        );
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        if (mounted) {
+          setPublicStudents((data ?? []) as PublicStudent[]);
+        }
+      } catch (err) {
+        console.error("Gagal mengambil direktori siswa:", err);
+
+        if (mounted) {
+          setError(
+            "Gagal memuat direktori siswa. Silakan coba kembali."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadPublicStudents();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const keyword = search.trim().toLowerCase();
 
   const filteredStudents = publicStudents.filter((student) => {
-    const keyword = search.toLowerCase();
-
     return (
-      student.name.toLowerCase().includes(keyword) ||
-      (student.profile?.fullName ?? "").toLowerCase().includes(keyword) ||
-      (student.profile?.major ?? "").toLowerCase().includes(keyword) ||
-      (student.profile?.school ?? "").toLowerCase().includes(keyword)
+      student.full_name.toLowerCase().includes(keyword) ||
+      student.major.toLowerCase().includes(keyword) ||
+      student.school.toLowerCase().includes(keyword)
     );
   });
 
@@ -103,7 +111,7 @@ export default function DirectoryPage() {
                 Siswa terpublikasi
               </p>
               <p className="text-2xl font-bold text-[#25364A]">
-                {publicStudents.length}
+                {loading ? "..." : publicStudents.length}
               </p>
             </div>
           </div>
@@ -124,87 +132,105 @@ export default function DirectoryPage() {
           </div>
         </div>
 
-        {filteredStudents.length > 0 ? (
+        {loading ? (
+          <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center">
+            <p className="text-sm text-gray-500">
+              Memuat direktori siswa...
+            </p>
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border border-red-200 bg-white px-6 py-16 text-center">
+            <h2 className="text-lg font-semibold text-[#25364A]">
+              Direktori gagal dimuat
+            </h2>
+
+            <p className="mt-2 text-sm text-red-600">{error}</p>
+
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-5 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
+            >
+              Muat Ulang
+            </button>
+          </div>
+        ) : filteredStudents.length > 0 ? (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredStudents.map((student) => {
-              const profile = student.profile;
+            {filteredStudents.map((student) => (
+              <article
+                key={student.id}
+                className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+              >
+                <div className="h-2 bg-[#0756A5]" />
 
-              return (
-                <article
-                  key={student.id}
-                  className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-                >
-                  <div className="h-2 bg-[#0756A5]" />
-
-                  <div className="p-6">
-                    <div className="mb-5 flex items-center gap-4">
-                      {profile?.photoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={profile.photoUrl}
-                          alt={profile.fullName || student.name}
-                          className="h-16 w-16 rounded-full border border-gray-200 object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-[#0756A5]">
-                          <UserRound size={30} />
-                        </div>
-                      )}
-
-                      <div className="min-w-0">
-                        <h2 className="truncate text-lg font-bold text-[#25364A]">
-                          {profile?.fullName || student.name}
-                        </h2>
-
-                        <span className="mt-1 inline-block rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
-                          Publik
-                        </span>
+                <div className="p-6">
+                  <div className="mb-5 flex items-center gap-4">
+                    {student.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={student.photo_url}
+                        alt={student.full_name}
+                        className="h-16 w-16 rounded-full border border-gray-200 object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-[#0756A5]">
+                        <UserRound size={30} />
                       </div>
-                    </div>
+                    )}
 
-                    <div className="space-y-3 border-t border-gray-100 pt-4">
-                      <div className="flex items-start gap-3 text-sm text-gray-600">
-                        <GraduationCap
-                          size={18}
-                          className="mt-0.5 shrink-0 text-[#0756A5]"
-                        />
-                        <span>
-                          {profile?.major || "Jurusan belum diisi"}
-                        </span>
-                      </div>
+                    <div className="min-w-0">
+                      <h2 className="truncate text-lg font-bold text-[#25364A]">
+                        {student.full_name}
+                      </h2>
 
-                      <div className="flex items-start gap-3 text-sm text-gray-600">
-                        <Users
-                          size={18}
-                          className="mt-0.5 shrink-0 text-[#0756A5]"
-                        />
-                        <span>
-                          {profile?.school || "Sekolah belum diisi"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 grid grid-cols-2 gap-3">
-                      <Link
-                        href={`/directory/${student.id}`}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0756A5] px-3 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-800"
-                      >
-                        Lihat Portofolio
-                        <ArrowRight size={16} />
-                      </Link>
-
-                      <Link
-                        href={`/directory/${student.id}/cv`}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#0756A5] px-3 py-3 text-center text-sm font-semibold text-[#0756A5] transition hover:bg-blue-50"
-                      >
-                        <FileText size={16} />
-                        Lihat CV
-                      </Link>
+                      <span className="mt-1 inline-block rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                        Publik
+                      </span>
                     </div>
                   </div>
-                </article>
-              );
-            })}
+
+                  <div className="space-y-3 border-t border-gray-100 pt-4">
+                    <div className="flex items-start gap-3 text-sm text-gray-600">
+                      <GraduationCap
+                        size={18}
+                        className="mt-0.5 shrink-0 text-[#0756A5]"
+                      />
+                      <span>
+                        {student.major || "Jurusan belum diisi"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-start gap-3 text-sm text-gray-600">
+                      <Users
+                        size={18}
+                        className="mt-0.5 shrink-0 text-[#0756A5]"
+                      />
+                      <span>
+                        {student.school || "Sekolah belum diisi"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-2 gap-3">
+                    <Link
+                      href={`/directory/${student.id}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0756A5] px-3 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-800"
+                    >
+                      Lihat Portofolio
+                      <ArrowRight size={16} />
+                    </Link>
+
+                    <Link
+                      href={`/directory/${student.id}/cv`}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#0756A5] px-3 py-3 text-center text-sm font-semibold text-[#0756A5] transition hover:bg-blue-50"
+                    >
+                      <FileText size={16} />
+                      Lihat CV
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center">

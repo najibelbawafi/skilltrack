@@ -1,7 +1,7 @@
 
 "use client";
 
-import { use, useSyncExternalStore } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -14,13 +14,7 @@ import {
   FileText,
 } from "lucide-react";
 
-import { getRegisteredStudents } from "@/lib/auth";
-import { getStudentProfile } from "@/lib/profile";
-import { getStudentProjects } from "@/lib/projects";
-import { getStudentCertificates } from "@/lib/certificates";
-import { getStudentAchievements } from "@/lib/achievements";
-import { getStudentSkills } from "@/lib/skills";
-import { getCVPublicationSettings } from "@/lib/cv-publication";
+import { supabase } from "@/lib/supabase";
 
 type PublicCVPageProps = {
   params: Promise<{ id: string }>;
@@ -44,6 +38,60 @@ type ThemeConfig = {
   text: string;
   muted: string;
   border: string;
+};
+
+type PublicProfile = {
+  id: string;
+  fullName: string;
+  major: string;
+  school: string;
+  photoUrl: string;
+  bio: string;
+  startYear: string;
+  graduationYear: string;
+};
+
+type PublicProject = {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  technologies: string;
+  year: string;
+  link: string;
+};
+
+type PublicCertificate = {
+  id: string;
+  title: string;
+  issuer: string;
+  issueDate: string;
+  description: string;
+  credentialUrl: string;
+  imageDataUrl: string;
+};
+
+type PublicAchievement = {
+  id: string;
+  title: string;
+  category: string;
+  organizer: string;
+  date: string;
+  description: string;
+  imageDataUrl: string;
+};
+
+type PublicSkill = {
+  id: string;
+  name: string;
+};
+
+type PublicCV = {
+  profile: PublicProfile | null;
+  projects: PublicProject[];
+  certificates: PublicCertificate[];
+  achievements: PublicAchievement[];
+  skills: PublicSkill[];
 };
 
 const CV_THEMES: ThemeConfig[] = [
@@ -121,54 +169,6 @@ const CV_THEMES: ThemeConfig[] = [
   },
 ];
 
-function subscribe(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener("skilltrack-cv-publication", callback);
-
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener("skilltrack-cv-publication", callback);
-  };
-}
-
-function getSnapshot() {
-  if (typeof window === "undefined") return "";
-
-  const keys = [
-    "skilltrack_users",
-    "skilltrack_cv_publication",
-    "skilltrack_profiles",
-    "skilltrack_projects",
-    "skilltrack_certificates",
-    "skilltrack_achievements",
-    "skilltrack_skills",
-  ];
-
-  try {
-    return keys
-      .map((key) => localStorage.getItem(key) ?? "")
-      .join("|");
-  } catch {
-    return "";
-  }
-}
-
-function getThemeSnapshot(studentId: string) {
-  if (typeof window === "undefined") return "";
-
-  try {
-    return (
-      localStorage.getItem(`skilltrack_cv_theme_${studentId}`) ?? ""
-    );
-  } catch {
-    return "";
-  }
-}
-
-function getServerSnapshot() {
-  return "";
-}
-
 function formatDate(value: string) {
   if (!value) return "-";
 
@@ -227,47 +227,113 @@ export default function PublicCVPage({
 }: PublicCVPageProps) {
   const { id: studentId } = use(params);
 
-  useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    getServerSnapshot
-  );
+  const [cv, setCv] = useState<PublicCV | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedTheme, setSelectedTheme] =
+    useState<CVTheme>("formal");
 
-  const savedTheme = useSyncExternalStore(
-    subscribe,
-    () => getThemeSnapshot(studentId),
-    getServerSnapshot
-  );
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem(
+        `skilltrack_cv_theme_${studentId}`
+      );
 
-  const student = getRegisteredStudents().find(
-    (item) => item.id === studentId
-  );
+      if (isCVTheme(savedTheme)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setSelectedTheme(savedTheme);
+      }
+    } catch {
+      setSelectedTheme("formal");
+    }
+  }, [studentId]);
 
-  const publication = student
-    ? getCVPublicationSettings(student.id)
-    : null;
+  useEffect(() => {
+    let mounted = true;
 
-  const isPublic = publication?.isPublic === true;
+    async function loadCV() {
+      try {
+        setLoading(true);
+        setError("");
 
-  if (!student || !isPublic) {
+        const { data, error: fetchError } = await supabase.rpc(
+          "get_public_student_cv",
+          {
+            student_id: studentId,
+          }
+        );
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        if (!mounted) return;
+
+        if (!data || !data.profile) {
+          setCv(null);
+          return;
+        }
+
+        setCv(data as PublicCV);
+      } catch (err) {
+        console.error("Gagal mengambil CV publik:", err);
+
+        if (mounted) {
+          setError("Gagal memuat CV. Silakan coba kembali.");
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    if (studentId) {
+      loadCV();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [studentId]);
+
+  if (loading) {
+    return <LoadingPage />;
+  }
+
+  if (error) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-5">
+        <div className="w-full max-w-md rounded-xl border border-red-200 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-xl font-bold text-[#25364A]">
+            CV Gagal Dimuat
+          </h1>
+
+          <p className="mt-2 text-sm text-red-600">{error}</p>
+
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-6 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+          >
+            Muat Ulang
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (!cv || !cv.profile) {
     return <NotAvailablePage />;
   }
 
-  const profile = getStudentProfile(studentId);
-  const projects = getStudentProjects(studentId);
-  const certificates = getStudentCertificates(studentId);
-  const achievements = getStudentAchievements(studentId);
-  const skills = getStudentSkills(studentId);
-
-  const selectedTheme = isCVTheme(savedTheme)
-    ? savedTheme
-    : "formal";
+  const { profile, projects, certificates, achievements, skills } = cv;
 
   const theme =
     CV_THEMES.find((item) => item.id === selectedTheme) ??
     CV_THEMES[0];
 
-  const fullName = profile?.fullName || student.name;
+  const fullName = profile.fullName || "Siswa";
   const isTwoColumn = selectedTheme === "two-column";
 
   const sectionTitle = (
@@ -294,7 +360,7 @@ export default function PublicCVPage({
         className="whitespace-pre-line text-sm leading-7"
         style={{ color: theme.muted }}
       >
-        {profile?.bio || "Belum ada deskripsi diri."}
+        {profile.bio || "Belum ada deskripsi diri."}
       </p>
     </section>
   );
@@ -304,15 +370,15 @@ export default function PublicCVPage({
       {sectionTitle(<GraduationCap size={18} />, "PENDIDIKAN")}
 
       <h3 className="font-semibold" style={{ color: theme.text }}>
-        {profile?.school || "Sekolah belum diisi"}
+        {profile.school || "Sekolah belum diisi"}
       </h3>
 
       <p className="mt-1 text-sm" style={{ color: theme.muted }}>
-        {profile?.major || "Jurusan belum diisi"}
+        {profile.major || "Jurusan belum diisi"}
       </p>
 
       <p className="mt-1 text-xs" style={{ color: theme.muted }}>
-        {profile?.startYear || "-"} - {profile?.graduationYear || "-"}
+        {profile.startYear || "-"} - {profile.graduationYear || "-"}
       </p>
     </section>
   );
@@ -579,7 +645,7 @@ export default function PublicCVPage({
             style={{ borderColor: theme.border }}
           >
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              {profile?.photoUrl && (
+              {profile.photoUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={profile.photoUrl}
@@ -609,8 +675,8 @@ export default function PublicCVPage({
                   className="mt-2 text-sm"
                   style={{ color: theme.muted }}
                 >
-                  {profile?.major || "Jurusan belum diisi"}
-                  {profile?.school ? ` | ${profile.school}` : ""}
+                  {profile.major || "Jurusan belum diisi"}
+                  {profile.school ? ` | ${profile.school}` : ""}
                 </p>
               </div>
             </div>

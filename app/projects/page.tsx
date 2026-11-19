@@ -4,7 +4,6 @@
 import {
   useEffect,
   useState,
-  useSyncExternalStore,
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -18,12 +17,9 @@ import {
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
-import { getCurrentUser } from "@/lib/auth";
-import {
-  getStudentProjects,
-  saveStudentProjects,
-  type StudentProject,
-} from "@/lib/projects";
+import { useAuth } from "@/app/providers";
+import { supabase } from "@/lib/supabase";
+import type { StudentProject } from "@/lib/projects";
 
 type ProjectForm = {
   title: string;
@@ -32,6 +28,18 @@ type ProjectForm = {
   technologies: string;
   year: string;
   link: string;
+};
+
+type ProjectRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  category: string;
+  description: string;
+  technologies: string;
+  year: string;
+  link: string;
+  created_at: string;
 };
 
 const initialForm: ProjectForm = {
@@ -59,30 +67,62 @@ function getSafeExternalUrl(value: string): string | null {
   }
 }
 
-function subscribeToAuth(callback: () => void) {
-  window.addEventListener("storage", callback);
-
-  return () => {
-    window.removeEventListener("storage", callback);
+function mapProject(row: ProjectRow): StudentProject {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    category: row.category,
+    description: row.description,
+    technologies: row.technologies,
+    year: row.year,
+    link: row.link,
+    createdAt: row.created_at,
   };
 }
 
-function getAuthSnapshot() {
-  return localStorage.getItem("skilltrack_current_user");
-}
-
-function getServerAuthSnapshot() {
-  return undefined;
-}
-
 function ProjectsManager({ userId }: { userId: string }) {
-  const [projects, setProjects] = useState<StudentProject[]>(
-    () => getStudentProjects(userId)
-  );
-
+  const [projects, setProjects] = useState<StudentProject[]>([]);
   const [form, setForm] = useState<ProjectForm>(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadProjects() {
+      setLoadingProjects(true);
+      setErrorMessage("");
+
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (!active) return;
+
+      if (error) {
+        setErrorMessage("Gagal memuat proyek. Silakan coba kembali.");
+        setLoadingProjects(false);
+        return;
+      }
+
+      const rows = (data ?? []) as ProjectRow[];
+      setProjects(rows.map(mapProject));
+      setLoadingProjects(false);
+    }
+
+    loadProjects();
+
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   function updateField(field: keyof ProjectForm, value: string) {
     setForm((previous) => ({
@@ -97,8 +137,10 @@ function ProjectsManager({ userId }: { userId: string }) {
     setShowForm(false);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (saving) return;
 
     const trimmedLink = form.link.trim();
 
@@ -109,30 +151,67 @@ function ProjectsManager({ userId }: { userId: string }) {
       return;
     }
 
-    const projectData: StudentProject = {
-      id: editingId ?? crypto.randomUUID(),
-      userId,
+    const existingProject = editingId
+      ? projects.find((project) => project.id === editingId)
+      : undefined;
+
+    const projectData = {
+      user_id: userId,
       title: form.title.trim(),
       category: form.category,
       description: form.description.trim(),
       technologies: form.technologies.trim(),
       year: form.year,
       link: trimmedLink,
-      createdAt: editingId
-        ? projects.find((project) => project.id === editingId)?.createdAt ??
-          new Date().toISOString()
-        : new Date().toISOString(),
     };
 
-    const updatedProjects = editingId
-      ? projects.map((project) =>
-          project.id === editingId ? projectData : project
-        )
-      : [projectData, ...projects];
+    setSaving(true);
+    setErrorMessage("");
 
-    setProjects(updatedProjects);
-    saveStudentProjects(userId, updatedProjects);
-    resetForm();
+    try {
+      if (editingId) {
+        const { data, error } = await supabase
+          .from("projects")
+          .update(projectData)
+          .eq("id", editingId)
+          .eq("user_id", userId)
+          .select("*")
+          .single();
+
+        if (error) throw error;
+
+        const updatedProject = mapProject(data as ProjectRow);
+
+        setProjects((previous) =>
+          previous.map((project) =>
+            project.id === editingId ? updatedProject : project
+          )
+        );
+      } else {
+        const { data, error } = await supabase
+          .from("projects")
+          .insert(projectData)
+          .select("*")
+          .single();
+
+        if (error) throw error;
+
+        const newProject = mapProject(data as ProjectRow);
+
+        setProjects((previous) => [newProject, ...previous]);
+      }
+
+      resetForm();
+    } catch (error) {
+      console.error("Gagal menyimpan proyek:", error);
+      setErrorMessage(
+        "Proyek gagal disimpan. Periksa koneksi dan konfigurasi Supabase."
+      );
+    } finally {
+      setSaving(false);
+    }
+
+    void existingProject;
   }
 
   function handleEdit(project: StudentProject) {
@@ -151,15 +230,36 @@ function ProjectsManager({ userId }: { userId: string }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleDelete(projectId: string) {
+  async function handleDelete(projectId: string) {
+    if (deletingId) return;
+
     if (!window.confirm("Yakin ingin menghapus proyek ini?")) return;
 
-    const updatedProjects = projects.filter(
-      (project) => project.id !== projectId
-    );
+    setDeletingId(projectId);
+    setErrorMessage("");
 
-    setProjects(updatedProjects);
-    saveStudentProjects(userId, updatedProjects);
+    try {
+      const { error } = await supabase
+        .from("projects")
+        .delete()
+        .eq("id", projectId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      setProjects((previous) =>
+        previous.filter((project) => project.id !== projectId)
+      );
+
+      if (editingId === projectId) {
+        resetForm();
+      }
+    } catch (error) {
+      console.error("Gagal menghapus proyek:", error);
+      setErrorMessage("Proyek gagal dihapus. Silakan coba kembali.");
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -195,6 +295,15 @@ function ProjectsManager({ userId }: { userId: string }) {
               Tambah Proyek
             </button>
           </div>
+
+          {errorMessage && (
+            <div
+              role="alert"
+              className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+            >
+              {errorMessage}
+            </div>
+          )}
 
           {showForm && (
             <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6">
@@ -245,12 +354,8 @@ function ProjectsManager({ userId }: { userId: string }) {
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
                     >
                       <option value="">Pilih kategori</option>
-                      <option value="Web Development">
-                        Web Development
-                      </option>
-                      <option value="IoT dan Robotika">
-                        IoT dan Robotika
-                      </option>
+                      <option value="Web Development">Web Development</option>
+                      <option value="IoT dan Robotika">IoT dan Robotika</option>
                       <option value="Elektronika">Elektronika</option>
                       <option value="Pemrograman">Pemrograman</option>
                       <option value="Desain">Desain</option>
@@ -337,14 +442,20 @@ function ProjectsManager({ userId }: { userId: string }) {
                 <div className="flex flex-wrap gap-3 pt-2">
                   <button
                     type="submit"
-                    className="rounded-lg bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+                    disabled={saving}
+                    className="rounded-lg bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {editingId ? "Simpan Perubahan" : "Simpan Proyek"}
+                    {saving
+                      ? "Menyimpan..."
+                      : editingId
+                        ? "Simpan Perubahan"
+                        : "Simpan Proyek"}
                   </button>
 
                   <button
                     type="button"
                     onClick={resetForm}
+                    disabled={saving}
                     className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
                   >
                     Batal
@@ -365,7 +476,13 @@ function ProjectsManager({ userId }: { userId: string }) {
               </span>
             </div>
 
-            {projects.length === 0 ? (
+            {loadingProjects ? (
+              <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center">
+                <p className="text-sm text-gray-500">
+                  Memuat proyek dari Supabase...
+                </p>
+              </div>
+            ) : projects.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-[#0756A5]">
                   <FolderKanban size={27} />
@@ -464,11 +581,12 @@ function ProjectsManager({ userId }: { userId: string }) {
 
                           <button
                             type="button"
+                            disabled={deletingId === project.id}
                             onClick={() => handleDelete(project.id)}
-                            className="flex items-center gap-1 text-sm font-medium text-red-500 hover:text-red-700"
+                            className="flex items-center gap-1 text-sm font-medium text-red-500 hover:text-red-700 disabled:opacity-50"
                           >
                             <Trash2 size={15} />
-                            Hapus
+                            {deletingId === project.id ? "Menghapus..." : "Hapus"}
                           </button>
                         </div>
                       </div>
@@ -486,20 +604,15 @@ function ProjectsManager({ userId }: { userId: string }) {
 
 export default function ProjectsPage() {
   const router = useRouter();
-
-  const userId = useSyncExternalStore(
-    subscribeToAuth,
-    getAuthSnapshot,
-    getServerAuthSnapshot
-  );
+  const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (userId === null) {
+    if (!loading && !user) {
       router.replace("/login");
     }
-  }, [userId, router]);
+  }, [loading, user, router]);
 
-  if (userId === undefined || userId === null) {
+  if (loading || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
         <p className="text-sm text-gray-500">Memuat proyek...</p>
@@ -507,15 +620,5 @@ export default function ProjectsPage() {
     );
   }
 
-  const user = getCurrentUser();
-
-  if (!user) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <p className="text-sm text-gray-500">Memuat proyek...</p>
-      </main>
-    );
-  }
-
-  return <ProjectsManager userId={user.id} />;
+  return <ProjectsManager key={user.id} userId={user.id} />;
 }

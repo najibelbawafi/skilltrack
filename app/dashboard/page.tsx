@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,56 +19,135 @@ import {
   FileText,
 } from "lucide-react";
 
-import { getCurrentUser, logoutUser } from "@/lib/auth";
-import { getStudentProfile } from "@/lib/profile";
-import { getStudentProjects } from "@/lib/projects";
-import { getStudentCertificates } from "@/lib/certificates";
-import { getStudentAchievements } from "@/lib/achievements";
+import { useAuth } from "@/app/providers";
+import { supabase } from "@/lib/supabase";
 
-function subscribeToAuth(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
+type DashboardSummary = {
+  profileComplete: boolean;
+  projects: number;
+  certificates: number;
+  achievements: number;
+};
 
-function getAuthSnapshot() {
-  return localStorage.getItem("skilltrack_current_user");
-}
-
-function getServerAuthSnapshot() {
-  return undefined;
-}
+const initialSummary: DashboardSummary = {
+  profileComplete: false,
+  projects: 0,
+  certificates: 0,
+  achievements: 0,
+};
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user, loading, signOut } = useAuth();
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [summary, setSummary] = useState(initialSummary);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState("");
 
-  const userId = useSyncExternalStore(
-    subscribeToAuth,
-    getAuthSnapshot,
-    getServerAuthSnapshot
-  );
-
-  const user = userId ? getCurrentUser() : null;
-  const profile = userId ? getStudentProfile(userId) : null;
-  const projects = userId ? getStudentProjects(userId) : [];
-  const certificates = userId ? getStudentCertificates(userId) : [];
-  const achievements = userId ? getStudentAchievements(userId) : [];
+  const userId = user?.id ?? null;
 
   useEffect(() => {
-    if (userId === null || (userId && !user)) {
+    if (!loading && !user) {
       router.replace("/login");
     }
-  }, [userId, router, user]);
+  }, [loading, user, router]);
 
-  function handleLogout() {
-    logoutUser();
+  useEffect(() => {
+    if (!userId) return;
+
+    let mounted = true;
+
+    async function loadDashboardSummary() {
+      setSummaryLoading(true);
+      setSummaryError("");
+
+      const [
+        profileResult,
+        projectsResult,
+        certificatesResult,
+        achievementsResult,
+      ] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", userId)
+          .maybeSingle(),
+
+        supabase
+          .from("projects")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId),
+
+        supabase
+          .from("certificates")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId),
+
+        supabase
+          .from("achievements")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId),
+      ]);
+
+      if (!mounted) return;
+
+      const errors = [
+        profileResult.error,
+        projectsResult.error,
+        certificatesResult.error,
+        achievementsResult.error,
+      ].filter(Boolean);
+
+      setSummary({
+        profileComplete: Boolean(
+          profileResult.data?.full_name?.trim()
+        ),
+        projects: projectsResult.count ?? 0,
+        certificates: certificatesResult.count ?? 0,
+        achievements: achievementsResult.count ?? 0,
+      });
+
+      if (errors.length > 0) {
+        console.error("Gagal memuat ringkasan dashboard:", errors);
+        setSummaryError(
+          "Sebagian ringkasan belum berhasil dimuat. Coba muat ulang halaman."
+        );
+      }
+
+      setSummaryLoading(false);
+    }
+
+    loadDashboardSummary();
+
+    return () => {
+      mounted = false;
+    };
+  }, [userId]);
+
+  async function handleLogout() {
+    if (logoutLoading) return;
+
+    setLogoutLoading(true);
+
+    const { error } = await signOut();
+
+    if (error) {
+      console.error("Logout gagal:", error);
+      setLogoutLoading(false);
+      return;
+    }
+
     router.replace("/login");
   }
 
-  if (userId === undefined || userId === null || !user) {
+  if (loading || !user || !userId) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <p className="text-sm text-gray-500">Memuat dashboard...</p>
+        <p className="text-sm text-gray-500">
+          Memuat dashboard...
+        </p>
       </main>
     );
   }
@@ -90,25 +169,25 @@ export default function DashboardPage() {
     { label: "Pengaturan", icon: Settings, href: "/settings" },
   ];
 
-  const summary = [
+  const summaryItems = [
     {
       label: "Profil Saya",
-      value: profile?.fullName ? "Sudah diisi" : "Belum diisi",
+      value: summary.profileComplete ? "Sudah diisi" : "Belum diisi",
       icon: User,
     },
     {
       label: "Proyek",
-      value: projects.length.toString(),
+      value: summary.projects.toString(),
       icon: FolderKanban,
     },
     {
       label: "Sertifikat",
-      value: certificates.length.toString(),
+      value: summary.certificates.toString(),
       icon: Award,
     },
     {
       label: "Pencapaian",
-      value: achievements.length.toString(),
+      value: summary.achievements.toString(),
       icon: Trophy,
     },
   ];
@@ -148,10 +227,11 @@ export default function DashboardPage() {
         <button
           type="button"
           onClick={handleLogout}
-          className="mt-auto flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-red-600 hover:bg-red-50"
+          disabled={logoutLoading}
+          className="mt-auto flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
         >
           <LogOut size={19} />
-          Keluar
+          {logoutLoading ? "Keluar..." : "Keluar"}
         </button>
       </aside>
 
@@ -219,10 +299,11 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex min-h-11 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                disabled={logoutLoading}
+                className="flex min-h-11 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
               >
                 <LogOut size={19} />
-                Keluar
+                {logoutLoading ? "Keluar..." : "Keluar"}
               </button>
             </nav>
           </div>
@@ -249,8 +330,14 @@ export default function DashboardPage() {
               Ringkasan Portofolio
             </h2>
 
+            {summaryError && (
+              <p className="mt-3 text-sm text-red-600">
+                {summaryError}
+              </p>
+            )}
+
             <div className="mt-4 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
-              {summary.map((item) => {
+              {summaryItems.map((item) => {
                 const Icon = item.icon;
 
                 return (
@@ -264,7 +351,7 @@ export default function DashboardPage() {
                     </div>
 
                     <p className="mt-4 break-words text-xl font-bold text-[#25364A]">
-                      {item.value}
+                      {summaryLoading ? "Memuat..." : item.value}
                     </p>
                   </div>
                 );

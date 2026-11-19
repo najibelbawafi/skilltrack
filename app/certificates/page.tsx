@@ -4,7 +4,6 @@
 import {
   useEffect,
   useState,
-  useSyncExternalStore,
   type FormEvent,
   type ChangeEvent,
 } from "react";
@@ -22,12 +21,35 @@ import {
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
-import { getCurrentUser } from "@/lib/auth";
-import {
-  getStudentCertificates,
-  saveStudentCertificates,
-  type StudentCertificate,
-} from "@/lib/certificates";
+import { useAuth } from "@/app/providers";
+import { supabase } from "@/lib/supabase";
+import type { StudentCertificate } from "@/lib/certificates";
+
+type CertificateRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  issuer: string;
+  issue_date: string;
+  description: string;
+  credential_url: string;
+  image_url: string | null;
+  created_at: string;
+};
+
+function mapCertificate(row: CertificateRow): StudentCertificate {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    issuer: row.issuer,
+    issueDate: row.issue_date,
+    description: row.description,
+    credentialUrl: row.credential_url,
+    imageDataUrl: row.image_url ?? "",
+    createdAt: row.created_at,
+  };
+}
 
 function getSafeExternalUrl(value: string): string | null {
   if (!value.trim()) return null;
@@ -45,24 +67,8 @@ function getSafeExternalUrl(value: string): string | null {
   }
 }
 
-function subscribeToAuth(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
-
-function getAuthSnapshot() {
-  return localStorage.getItem("skilltrack_current_user");
-}
-
-function getServerAuthSnapshot() {
-  return undefined;
-}
-
 function CertificateManager({ userId }: { userId: string }) {
-  const [certificates, setCertificates] = useState<StudentCertificate[]>(
-    () => getStudentCertificates(userId)
-  );
-
+  const [certificates, setCertificates] = useState<StudentCertificate[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -72,6 +78,46 @@ function CertificateManager({ userId }: { userId: string }) {
   const [description, setDescription] = useState("");
   const [credentialUrl, setCredentialUrl] = useState("");
   const [certificateImage, setCertificateImage] = useState("");
+
+  const [loadingCertificates, setLoadingCertificates] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadCertificates() {
+      setLoadingCertificates(true);
+      setErrorMessage("");
+
+      const { data, error } = await supabase
+        .from("certificates")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (!active) return;
+
+      if (error) {
+        console.error("Gagal memuat sertifikat:", error);
+        setErrorMessage("Gagal memuat sertifikat. Silakan coba kembali.");
+        setLoadingCertificates(false);
+        return;
+      }
+
+      const rows = (data ?? []) as CertificateRow[];
+
+      setCertificates(rows.map(mapCertificate));
+      setLoadingCertificates(false);
+    }
+
+    loadCertificates();
+
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   function resetForm() {
     setTitle("");
@@ -124,8 +170,10 @@ function CertificateManager({ userId }: { userId: string }) {
     event.target.value = "";
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (saving) return;
 
     const trimmedUrl = credentialUrl.trim();
 
@@ -136,34 +184,62 @@ function CertificateManager({ userId }: { userId: string }) {
       return;
     }
 
-    const certificateData: StudentCertificate = {
-      id: editingId ?? crypto.randomUUID(),
-      userId,
+    const certificateData = {
+      user_id: userId,
       title: title.trim(),
       issuer: issuer.trim(),
-      issueDate,
+      issue_date: issueDate,
       description: description.trim(),
-      credentialUrl: trimmedUrl,
-      imageDataUrl: certificateImage,
-      createdAt:
-        certificates.find((item) => item.id === editingId)?.createdAt ??
-        new Date().toISOString(),
+      credential_url: trimmedUrl,
+      image_url: certificateImage || null,
     };
 
-    const updatedCertificates = editingId
-      ? certificates.map((item) =>
-          item.id === editingId ? certificateData : item
-        )
-      : [certificateData, ...certificates];
+    setSaving(true);
+    setErrorMessage("");
 
     try {
-      saveStudentCertificates(userId, updatedCertificates);
-      setCertificates(updatedCertificates);
+      if (editingId) {
+        const { data, error } = await supabase
+          .from("certificates")
+          .update(certificateData)
+          .eq("id", editingId)
+          .eq("user_id", userId)
+          .select("*")
+          .single();
+
+        if (error) throw error;
+
+        const updatedCertificate = mapCertificate(
+          data as CertificateRow
+        );
+
+        setCertificates((previous) =>
+          previous.map((item) =>
+            item.id === editingId ? updatedCertificate : item
+          )
+        );
+      } else {
+        const { data, error } = await supabase
+          .from("certificates")
+          .insert(certificateData)
+          .select("*")
+          .single();
+
+        if (error) throw error;
+
+        const newCertificate = mapCertificate(data as CertificateRow);
+
+        setCertificates((previous) => [newCertificate, ...previous]);
+      }
+
       resetForm();
-    } catch {
-      window.alert(
-        "Penyimpanan gagal. Coba gunakan foto dengan ukuran lebih kecil."
+    } catch (error) {
+      console.error("Gagal menyimpan sertifikat:", error);
+      setErrorMessage(
+        "Gagal menyimpan sertifikat. Periksa koneksi dan konfigurasi Supabase."
       );
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -176,24 +252,43 @@ function CertificateManager({ userId }: { userId: string }) {
     setCredentialUrl(certificate.credentialUrl);
     setCertificateImage(certificate.imageDataUrl ?? "");
     setShowForm(true);
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
+    if (deletingId) return;
+
     const confirmed = window.confirm(
       "Apakah kamu yakin ingin menghapus sertifikat ini?"
     );
 
     if (!confirmed) return;
 
-    const updatedCertificates = certificates.filter(
-      (item) => item.id !== id
-    );
+    setDeletingId(id);
+    setErrorMessage("");
 
     try {
-      saveStudentCertificates(userId, updatedCertificates);
-      setCertificates(updatedCertificates);
-    } catch {
-      window.alert("Gagal menghapus sertifikat.");
+      const { error } = await supabase
+        .from("certificates")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      setCertificates((previous) =>
+        previous.filter((item) => item.id !== id)
+      );
+
+      if (editingId === id) {
+        resetForm();
+      }
+    } catch (error) {
+      console.error("Gagal menghapus sertifikat:", error);
+      setErrorMessage("Gagal menghapus sertifikat. Silakan coba kembali.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -233,6 +328,15 @@ function CertificateManager({ userId }: { userId: string }) {
               Tambah Sertifikat
             </button>
           </div>
+
+          {errorMessage && (
+            <div
+              role="alert"
+              className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+            >
+              {errorMessage}
+            </div>
+          )}
 
           <div className="mt-8 rounded-xl border border-gray-200 bg-white p-5">
             <div className="flex items-center gap-3">
@@ -367,7 +471,6 @@ function CertificateManager({ userId }: { userId: string }) {
 
                   {certificateImage && (
                     <div className="mt-4">
-                      {/* Pratinjau foto sertifikat */}
                       <div className="relative h-56 w-full overflow-hidden rounded-xl border border-gray-200 bg-gray-100">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -391,14 +494,20 @@ function CertificateManager({ userId }: { userId: string }) {
                 <div className="flex flex-wrap gap-3">
                   <button
                     type="submit"
-                    className="rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+                    disabled={saving}
+                    className="rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {editingId ? "Simpan Perubahan" : "Simpan Sertifikat"}
+                    {saving
+                      ? "Menyimpan..."
+                      : editingId
+                        ? "Simpan Perubahan"
+                        : "Simpan Sertifikat"}
                   </button>
 
                   <button
                     type="button"
                     onClick={resetForm}
+                    disabled={saving}
                     className="rounded-lg border border-gray-300 px-5 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50"
                   >
                     Batal
@@ -413,7 +522,13 @@ function CertificateManager({ userId }: { userId: string }) {
               Daftar Sertifikat
             </h2>
 
-            {certificates.length === 0 ? (
+            {loadingCertificates ? (
+              <div className="mt-4 rounded-xl border border-gray-200 bg-white px-6 py-16 text-center">
+                <p className="text-sm text-gray-500">
+                  Memuat sertifikat dari Supabase...
+                </p>
+              </div>
+            ) : certificates.length === 0 ? (
               <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center">
                 <Award className="mx-auto text-gray-300" size={42} />
 
@@ -482,8 +597,9 @@ function CertificateManager({ userId }: { userId: string }) {
 
                             <button
                               type="button"
+                              disabled={deletingId === certificate.id}
                               onClick={() => handleDelete(certificate.id)}
-                              className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                              className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                               aria-label="Hapus sertifikat"
                             >
                               <Trash2 size={17} />
@@ -532,22 +648,15 @@ function CertificateManager({ userId }: { userId: string }) {
 
 export default function CertificatesPage() {
   const router = useRouter();
-
-  const userId = useSyncExternalStore(
-    subscribeToAuth,
-    getAuthSnapshot,
-    getServerAuthSnapshot
-  );
-
-  const user = userId ? getCurrentUser() : null;
+  const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (userId === null || (userId && !user)) {
+    if (!loading && !user) {
       router.replace("/login");
     }
-  }, [userId, user, router]);
+  }, [loading, user, router]);
 
-  if (userId === undefined || userId === null || !user) {
+  if (loading || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
         <p className="text-sm text-gray-500">Memuat sertifikat...</p>
@@ -555,5 +664,5 @@ export default function CertificatesPage() {
     );
   }
 
-  return <CertificateManager userId={userId} />;
+  return <CertificateManager key={user.id} userId={user.id} />;
 }

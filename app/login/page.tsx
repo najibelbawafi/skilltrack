@@ -12,7 +12,7 @@ import {
   EyeOff,
   GraduationCap,
 } from "lucide-react";
-import { loginUser } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,16 +35,24 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await loginUser(email, password);
+      const { error: loginError } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
 
-      if (!result.success) {
-        setError(result.message);
+      if (loginError) {
+        if (loginError.message.toLowerCase().includes("email not confirmed")) {
+          setError("Email belum diverifikasi. Periksa kotak masuk email kamu.");
+        } else {
+          setError("Email atau password salah.");
+        }
         return;
       }
 
-      router.push("/dashboard");
+      router.replace("/dashboard");
     } catch {
-      setError("Terjadi kesalahan. Silakan coba kembali.");
+      setError("Terjadi kesalahan koneksi. Silakan coba kembali.");
     } finally {
       setLoading(false);
     }
@@ -89,6 +97,8 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nama@email.com"
+                  autoComplete="email"
+                  required
                   className="w-full bg-transparent px-3 py-3 text-sm text-slate-700 outline-none"
                 />
               </div>
@@ -107,6 +117,8 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Masukkan password"
+                  autoComplete="current-password"
+                  required
                   className="w-full bg-transparent px-3 py-3 text-sm text-slate-700 outline-none"
                 />
 
@@ -114,6 +126,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="text-slate-400 hover:text-slate-600"
+                  aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>

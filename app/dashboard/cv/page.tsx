@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -25,21 +25,11 @@ import {
   Globe,
 } from "lucide-react";
 
-import { getCurrentUser } from "@/lib/auth";
-import { getStudentProfile } from "@/lib/profile";
-import { getStudentProjects } from "@/lib/projects";
-import { getStudentCertificates } from "@/lib/certificates";
-import { getStudentAchievements } from "@/lib/achievements";
-import {
-  getStudentSkills,
-  saveStudentSkills,
-  type StudentSkill,
-} from "@/lib/skills";
+import { useAuth } from "@/app/providers";
+import { supabase } from "@/lib/supabase";
+import type { StudentProfile } from "@/lib/profile";
+import type { StudentSkill } from "@/lib/skills";
 import { downloadElementAsPDF } from "@/lib/pdf";
-import {
-  getCVPublicationSettings,
-  saveCVPublicationSettings,
-} from "@/lib/cv-publication";
 
 type CVTheme =
   | "formal"
@@ -61,6 +51,108 @@ type ThemeConfig = {
   muted: string;
   border: string;
   header: string;
+};
+
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  birth_place: string | null;
+  birth_date: string | null;
+  gender: string | null;
+  address: string | null;
+  bio: string | null;
+  major: string | null;
+  school: string | null;
+  start_year: string | null;
+  graduation_year: string | null;
+  photo_url: string | null;
+  updated_at: string | null;
+};
+
+type ProjectRow = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  category: string | null;
+  description: string | null;
+  technologies: string | null;
+  year: string | null;
+  link: string | null;
+  created_at: string;
+};
+
+type CertificateRow = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  issuer: string | null;
+  issue_date: string | null;
+  description: string | null;
+  credential_url: string | null;
+  image_url: string | null;
+  created_at: string;
+};
+
+type AchievementRow = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  category: string | null;
+  organizer: string | null;
+  date: string | null;
+  description: string | null;
+  image_url: string | null;
+  created_at: string;
+};
+
+type SkillRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+};
+
+type CVPublicationRow = {
+  user_id: string;
+  is_public: boolean;
+  updated_at: string;
+};
+
+type StudentProject = {
+  id: string;
+  userId: string;
+  title: string;
+  category: string;
+  description: string;
+  technologies: string;
+  year: string;
+  link: string;
+  createdAt: string;
+};
+
+type StudentCertificate = {
+  id: string;
+  userId: string;
+  title: string;
+  issuer: string;
+  issueDate: string;
+  description: string;
+  credentialUrl: string;
+  imageDataUrl?: string;
+  createdAt: string;
+};
+
+type StudentAchievement = {
+  id: string;
+  userId: string;
+  title: string;
+  category: string;
+  organizer: string;
+  date: string;
+  description: string;
+  imageDataUrl: string;
+  createdAt: string;
 };
 
 const CV_THEMES: ThemeConfig[] = [
@@ -154,23 +246,11 @@ const CV_THEMES: ThemeConfig[] = [
   },
 ];
 
-function subscribeToAuth(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
-
-function getAuthSnapshot() {
-  return localStorage.getItem("skilltrack_current_user");
-}
-
-function getServerAuthSnapshot() {
-  return undefined;
-}
-
 function formatDate(value: string) {
   if (!value) return "-";
 
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleDateString("id-ID", {
@@ -183,53 +263,284 @@ function isCVTheme(value: string | null): value is CVTheme {
   return CV_THEMES.some((theme) => theme.id === value);
 }
 
+function mapProfile(
+  row: ProfileRow,
+  email: string,
+  fallbackName: string
+): StudentProfile {
+  return {
+    userId: row.id,
+    fullName: row.full_name ?? fallbackName,
+    email,
+    phone: row.phone ?? "",
+    birthPlace: row.birth_place ?? "",
+    birthDate: row.birth_date ?? "",
+    gender: row.gender ?? "",
+    address: row.address ?? "",
+    bio: row.bio ?? "",
+    major: row.major ?? "",
+    school: row.school ?? "",
+    startYear: row.start_year ?? "",
+    graduationYear: row.graduation_year ?? "",
+    photoUrl: row.photo_url ?? "",
+    updatedAt: row.updated_at ?? "",
+  };
+}
+
+function mapProject(row: ProjectRow): StudentProject {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title ?? "",
+    category: row.category ?? "",
+    description: row.description ?? "",
+    technologies: row.technologies ?? "",
+    year: row.year ?? "",
+    link: row.link ?? "",
+    createdAt: row.created_at,
+  };
+}
+
+function mapCertificate(row: CertificateRow): StudentCertificate {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title ?? "",
+    issuer: row.issuer ?? "",
+    issueDate: row.issue_date ?? "",
+    description: row.description ?? "",
+    credentialUrl: row.credential_url ?? "",
+    imageDataUrl: row.image_url ?? "",
+    createdAt: row.created_at,
+  };
+}
+
+function mapAchievement(row: AchievementRow): StudentAchievement {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title ?? "",
+    category: row.category ?? "",
+    organizer: row.organizer ?? "",
+    date: row.date ?? "",
+    description: row.description ?? "",
+    imageDataUrl: row.image_url ?? "",
+    createdAt: row.created_at,
+  };
+}
+
+function mapSkill(row: SkillRow): StudentSkill {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    createdAt: row.created_at,
+  };
+}
+
 export default function CVPage() {
   const router = useRouter();
   const cvRef = useRef<HTMLDivElement>(null);
 
-  const userId = useSyncExternalStore(
-    subscribeToAuth,
-    getAuthSnapshot,
-    getServerAuthSnapshot
-  );
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
 
-  const user = userId ? getCurrentUser() : null;
-  const profile = userId ? getStudentProfile(userId) : null;
-  const projects = userId ? getStudentProjects(userId) : [];
-  const certificates = userId ? getStudentCertificates(userId) : [];
-  const achievements = userId ? getStudentAchievements(userId) : [];
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [projects, setProjects] = useState<StudentProject[]>([]);
+  const [certificates, setCertificates] = useState<StudentCertificate[]>([]);
+  const [achievements, setAchievements] = useState<StudentAchievement[]>([]);
 
   const [skills, setSkills] = useState<StudentSkill[]>([]);
   const [newSkill, setNewSkill] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [skillsLoading, setSkillsLoading] = useState(true);
+  const [savingSkill, setSavingSkill] = useState(false);
+  const [deletingSkillId, setDeletingSkillId] = useState<string | null>(null);
+  const [savingPublication, setSavingPublication] = useState(false);
   const [error, setError] = useState("");
   const [selectedTheme, setSelectedTheme] = useState<CVTheme>("formal");
   const [cvIsPublic, setCvIsPublic] = useState(false);
 
   useEffect(() => {
-    if (userId === null || (userId && !user)) {
+    if (!authLoading && !user) {
       router.replace("/login");
     }
-  }, [userId, user, router]);
+  }, [authLoading, user, router]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !user) return;
 
-    setSkills(getStudentSkills(userId));
+    let active = true;
 
-    const savedTheme = localStorage.getItem(
-      `skilltrack_cv_theme_${userId}`
-    );
+    async function loadPageData() {
+      setLoaded(false);
+      setSkillsLoading(true);
+      setError("");
 
-    setSelectedTheme(
-      isCVTheme(savedTheme) ? savedTheme : "formal"
-    );
+      const savedTheme = localStorage.getItem(
+        `skilltrack_cv_theme_${userId}`
+      );
 
-    setCvIsPublic(getCVPublicationSettings(userId).isPublic);
+      setSelectedTheme(
+        isCVTheme(savedTheme) ? savedTheme : "formal"
+      );
 
-    setLoaded(true);
-  }, [userId]);
+      const [
+        profileResult,
+        projectsResult,
+        certificatesResult,
+        achievementsResult,
+        skillsResult,
+        publicationResult,
+      ] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle(),
+
+        supabase
+          .from("projects")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }),
+
+        supabase
+          .from("certificates")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }),
+
+        supabase
+          .from("achievements")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }),
+
+        supabase
+          .from("skills")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: true }),
+
+        supabase
+          .from("cv_publication_settings")
+          .select("*")
+          .eq("user_id", userId)
+          .maybeSingle(),
+      ]);
+
+      if (!active) return;
+
+      const loadErrors: string[] = [];
+
+      if (profileResult.error) {
+        console.error("Gagal memuat profil:", profileResult.error);
+        loadErrors.push("profil");
+      } else {
+        const row = profileResult.data as ProfileRow | null;
+
+        setProfile(
+          row
+            ? mapProfile(row, user?.email ?? "", user?.name ?? "Pengguna")
+            : null
+        );
+      }
+
+      if (projectsResult.error) {
+        console.error("Gagal memuat proyek:", projectsResult.error);
+        loadErrors.push("proyek");
+        setProjects([]);
+      } else {
+        setProjects(
+          ((projectsResult.data ?? []) as ProjectRow[]).map(mapProject)
+        );
+      }
+
+      if (certificatesResult.error) {
+        console.error(
+          "Gagal memuat sertifikat:",
+          certificatesResult.error
+        );
+        loadErrors.push("sertifikat");
+        setCertificates([]);
+      } else {
+        setCertificates(
+          ((certificatesResult.data ?? []) as CertificateRow[]).map(
+            mapCertificate
+          )
+        );
+      }
+
+      if (achievementsResult.error) {
+        console.error(
+          "Gagal memuat pencapaian:",
+          achievementsResult.error
+        );
+        loadErrors.push("pencapaian");
+        setAchievements(
+          []
+        );
+      } else {
+        setAchievements(
+          ((achievementsResult.data ?? []) as AchievementRow[]).map(
+            mapAchievement
+          )
+        );
+      }
+
+      if (skillsResult.error) {
+        console.error(
+          "Gagal memuat keterampilan:",
+          skillsResult.error
+        );
+        loadErrors.push("keterampilan");
+        setSkills([]);
+      } else {
+        setSkills(
+          ((skillsResult.data ?? []) as SkillRow[]).map(mapSkill)
+        );
+      }
+
+      if (publicationResult.error) {
+        console.error(
+          "Gagal memuat pengaturan publikasi CV:",
+          publicationResult.error
+        );
+        loadErrors.push("pengaturan publikasi CV");
+        setCvIsPublic(false);
+      } else {
+        const publication =
+          publicationResult.data as CVPublicationRow | null;
+
+        setCvIsPublic(publication?.is_public ?? false);
+      }
+
+      if (loadErrors.length > 0) {
+        setError(
+          `Sebagian data gagal dimuat: ${loadErrors.join(", ")}. Periksa koneksi dan konfigurasi Supabase.`
+        );
+      }
+
+      setSkillsLoading(false);
+      setLoaded(true);
+    }
+
+    loadPageData().catch((err) => {
+      console.error("Gagal memuat data CV:", err);
+
+      if (active) {
+        setError("Terjadi kesalahan saat memuat data CV.");
+        setSkillsLoading(false);
+        setLoaded(true);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [userId, user]);
 
   const theme =
     CV_THEMES.find((item) => item.id === selectedTheme) ||
@@ -246,24 +557,56 @@ export default function CVPage() {
     );
   }
 
-  function toggleCVPublication() {
-    if (!userId) return;
+  async function toggleCVPublication() {
+    if (!userId || savingPublication) return;
 
     const nextStatus = !cvIsPublic;
 
+    setSavingPublication(true);
+    setError("");
+
     try {
-      saveCVPublicationSettings(userId, nextStatus);
+      const { error: publicationError } = await supabase
+        .from("cv_publication_settings")
+        .upsert(
+          {
+            user_id: userId,
+            is_public: nextStatus,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id",
+          }
+        );
+
+      if (publicationError) {
+        throw publicationError;
+      }
+
       setCvIsPublic(nextStatus);
-      setError("");
-    } catch {
-      setError("Gagal menyimpan pengaturan publikasi CV.");
+    } catch (err) {
+      console.error(
+        "Gagal menyimpan pengaturan publikasi CV:",
+        err
+      );
+
+      setError(
+        "Gagal menyimpan pengaturan publikasi CV. Silakan coba kembali."
+      );
+    } finally {
+      setSavingPublication(false);
     }
   }
 
-  function addSkill() {
+  async function addSkill() {
     const name = newSkill.trim();
 
-    if (!name || !userId) return;
+    if (!name || !userId || savingSkill) return;
+
+    if (name.length > 60) {
+      setError("Nama keterampilan maksimal 60 karakter.");
+      return;
+    }
 
     if (
       skills.some(
@@ -274,35 +617,63 @@ export default function CVPage() {
       return;
     }
 
-    const updated = [
-      ...skills,
-      {
-        id: crypto.randomUUID(),
-        userId,
-        name,
-        createdAt: new Date().toISOString(),
-      },
-    ];
-
-    setSkills(updated);
-    saveStudentSkills(userId, updated);
-    setNewSkill("");
+    setSavingSkill(true);
     setError("");
+
+    try {
+      const { data, error: insertError } = await supabase
+        .from("skills")
+        .insert({
+          user_id: userId,
+          name,
+        })
+        .select("*")
+        .single();
+
+      if (insertError) throw insertError;
+
+      const newSkillData = mapSkill(data as SkillRow);
+
+      setSkills((previous) => [...previous, newSkillData]);
+      setNewSkill("");
+    } catch (err) {
+      console.error("Gagal menambahkan keterampilan:", err);
+      setError("Gagal menambahkan keterampilan. Silakan coba kembali.");
+    } finally {
+      setSavingSkill(false);
+    }
   }
 
-  function removeSkill(id: string) {
-    if (!userId) return;
+  async function removeSkill(id: string) {
+    if (!userId || deletingSkillId) return;
 
-    const updated = skills.filter((skill) => skill.id !== id);
-    setSkills(updated);
-    saveStudentSkills(userId, updated);
+    setDeletingSkillId(id);
     setError("");
+
+    try {
+      const { error: deleteError } = await supabase
+        .from("skills")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      if (deleteError) throw deleteError;
+
+      setSkills((previous) =>
+        previous.filter((skill) => skill.id !== id)
+      );
+    } catch (err) {
+      console.error("Gagal menghapus keterampilan:", err);
+      setError("Gagal menghapus keterampilan. Silakan coba kembali.");
+    } finally {
+      setDeletingSkillId(null);
+    }
   }
 
   async function handleDownload() {
-    if (!cvRef.current || loading) return;
+    if (!cvRef.current || generatingPdf) return;
 
-    setLoading(true);
+    setGeneratingPdf(true);
     setError("");
 
     try {
@@ -319,11 +690,11 @@ export default function CVPage() {
       console.error("Gagal membuat PDF:", err);
       setError("PDF gagal dibuat. Silakan coba kembali.");
     } finally {
-      setLoading(false);
+      setGeneratingPdf(false);
     }
   }
 
-  if (userId === undefined || userId === null || !user || !loaded) {
+  if (authLoading || !user || !loaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
         <p className="text-sm text-gray-500">Memuat CV...</p>
@@ -574,14 +945,23 @@ export default function CVPage() {
             <button
               type="button"
               onClick={toggleCVPublication}
-              className={`mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition ${
+              disabled={savingPublication}
+              className={`mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 cvIsPublic
                   ? "border border-red-200 bg-white text-red-600 hover:bg-red-50"
                   : "bg-[#0756A5] text-white hover:bg-blue-800"
               }`}
             >
-              <Globe size={17} />
-              {cvIsPublic ? "Jadikan Privat" : "Publikasikan CV"}
+              {savingPublication ? (
+                <LoaderCircle size={17} className="animate-spin" />
+              ) : (
+                <Globe size={17} />
+              )}
+              {savingPublication
+                ? "Menyimpan..."
+                : cvIsPublic
+                  ? "Jadikan Privat"
+                  : "Publikasikan CV"}
             </button>
           </div>
 
@@ -678,21 +1058,33 @@ export default function CVPage() {
 
               <button
                 type="submit"
-                className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0756A5] px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                disabled={savingSkill || skillsLoading}
+                className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0756A5] px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Plus size={17} />
-                Tambah Keterampilan
+                {savingSkill ? (
+                  <LoaderCircle size={17} className="animate-spin" />
+                ) : (
+                  <Plus size={17} />
+                )}
+                {savingSkill ? "Menyimpan..." : "Tambah Keterampilan"}
               </button>
             </form>
 
             {error && (
-              <p className="rounded-lg bg-red-50 p-3 text-xs text-red-700">
+              <p
+                role="alert"
+                className="rounded-lg bg-red-50 p-3 text-xs text-red-700"
+              >
                 {error}
               </p>
             )}
 
             <div className="space-y-2">
-              {skills.length === 0 ? (
+              {skillsLoading ? (
+                <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
+                  Memuat keterampilan...
+                </p>
+              ) : skills.length === 0 ? (
                 <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
                   Belum ada keterampilan. Tambahkan keterampilan untuk
                   melengkapi CV.
@@ -709,11 +1101,16 @@ export default function CVPage() {
 
                     <button
                       type="button"
+                      disabled={deletingSkillId === skill.id}
                       onClick={() => removeSkill(skill.id)}
-                      className="shrink-0 rounded-md p-2 text-red-600 hover:bg-red-50"
+                      className="shrink-0 rounded-md p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
                       aria-label={`Hapus ${skill.name}`}
                     >
-                      <Trash2 size={16} />
+                      {deletingSkillId === skill.id ? (
+                        <LoaderCircle size={16} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
                     </button>
                   </div>
                 ))
@@ -722,9 +1119,8 @@ export default function CVPage() {
 
             <div className="border-t border-gray-100 pt-4">
               <p className="text-xs leading-5 text-gray-500">
-                Data CV tersimpan pada LocalStorage browser ini. Pastikan
-                informasi profil, proyek, sertifikat, dan pencapaian sudah
-                diperbarui.
+                Data profil, proyek, sertifikat, pencapaian, keterampilan,
+                dan pengaturan publikasi CV diambil dari Supabase.
               </p>
             </div>
 
@@ -872,16 +1268,16 @@ export default function CVPage() {
             <button
               type="button"
               onClick={handleDownload}
-              disabled={loading}
+              disabled={generatingPdf}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? (
+              {generatingPdf ? (
                 <LoaderCircle size={17} className="animate-spin" />
               ) : (
                 <Download size={17} />
               )}
 
-              {loading ? "Membuat PDF..." : "Unduh CV PDF"}
+              {generatingPdf ? "Membuat PDF..." : "Unduh CV PDF"}
             </button>
           </div>
 

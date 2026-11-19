@@ -4,7 +4,6 @@
 import {
   useEffect,
   useState,
-  useSyncExternalStore,
   type FormEvent,
   type ChangeEvent,
 } from "react";
@@ -21,31 +20,40 @@ import {
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
-import { getCurrentUser } from "@/lib/auth";
-import {
-  getStudentAchievements,
-  saveStudentAchievements,
-  type StudentAchievement,
-} from "@/lib/achievements";
+import { useAuth } from "@/app/providers";
+import { supabase } from "@/lib/supabase";
+import type { StudentAchievement } from "@/lib/achievements";
 
-function subscribeToAuth(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
+type AchievementRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  category: string;
+  organizer: string;
+  date: string;
+  description: string;
+  image_url: string | null;
+  created_at: string;
+};
 
-function getAuthSnapshot() {
-  return localStorage.getItem("skilltrack_current_user");
-}
-
-function getServerAuthSnapshot() {
-  return undefined;
+function mapAchievement(row: AchievementRow): StudentAchievement {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    category: row.category,
+    organizer: row.organizer,
+    date: row.date,
+    description: row.description,
+    imageDataUrl: row.image_url ?? "",
+    createdAt: row.created_at,
+  };
 }
 
 function isValidImageDataUrl(value: string) {
   return /^data:image\/(jpeg|png|webp);base64,/i.test(value);
 }
 
-// Validasi menggunakan kalender lokal, tanpa konversi UTC.
 function isValidDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
 
@@ -60,9 +68,7 @@ function isValidDate(value: string) {
 }
 
 function AchievementManager({ userId }: { userId: string }) {
-  const [achievements, setAchievements] = useState<StudentAchievement[]>(
-    () => getStudentAchievements(userId)
-  );
+  const [achievements, setAchievements] = useState<StudentAchievement[]>([]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -75,8 +81,47 @@ function AchievementManager({ userId }: { userId: string }) {
   const [achievementImage, setAchievementImage] = useState("");
   const [message, setMessage] = useState("");
 
+  const [loadingAchievements, setLoadingAchievements] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const inputClass =
     "w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-[#0756A5] focus:ring-2 focus:ring-blue-100";
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadAchievements() {
+      setLoadingAchievements(true);
+      setMessage("");
+
+      const { data, error } = await supabase
+        .from("achievements")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (!active) return;
+
+      if (error) {
+        console.error("Gagal memuat pencapaian:", error);
+        setMessage("Gagal memuat pencapaian. Silakan coba kembali.");
+        setLoadingAchievements(false);
+        return;
+      }
+
+      const rows = (data ?? []) as AchievementRow[];
+
+      setAchievements(rows.map(mapAchievement));
+      setLoadingAchievements(false);
+    }
+
+    loadAchievements();
+
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   function resetForm() {
     setTitle("");
@@ -131,16 +176,12 @@ function AchievementManager({ userId }: { userId: string }) {
     event.target.value = "";
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (saving) return;
+
     setMessage("");
-
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || currentUser.id !== userId) {
-      setMessage("Sesi akun tidak valid. Silakan login kembali.");
-      return;
-    }
 
     const cleanTitle = title.trim();
     const cleanOrganizer = organizer.trim();
@@ -187,18 +228,18 @@ function AchievementManager({ userId }: { userId: string }) {
       return;
     }
 
-    if (
-      achievementImage &&
-      !isValidImageDataUrl(achievementImage)
-    ) {
+    if (date > new Date().toISOString().split("T")[0]) {
+      setMessage("Tanggal pencapaian tidak boleh di masa depan.");
+      return;
+    }
+
+    if (achievementImage && !isValidImageDataUrl(achievementImage)) {
       setMessage("Data gambar tidak valid. Silakan upload ulang.");
       return;
     }
 
     const existingAchievement = editingId
-      ? achievements.find(
-          (item) => item.id === editingId && item.userId === userId
-        )
+      ? achievements.find((item) => item.id === editingId)
       : null;
 
     if (editingId && !existingAchievement) {
@@ -206,33 +247,61 @@ function AchievementManager({ userId }: { userId: string }) {
       return;
     }
 
-    const achievementData: StudentAchievement = {
-      id: editingId ?? crypto.randomUUID(),
-      userId,
+    const achievementData = {
+      user_id: userId,
       title: cleanTitle,
       category,
       organizer: cleanOrganizer,
       date,
       description: cleanDescription,
-      imageDataUrl: achievementImage,
-      createdAt:
-        existingAchievement?.createdAt ?? new Date().toISOString(),
+      image_url: achievementImage || null,
     };
 
-    const updatedAchievements = editingId
-      ? achievements.map((item) =>
-          item.id === editingId ? achievementData : item
-        )
-      : [achievementData, ...achievements];
+    setSaving(true);
 
     try {
-      saveStudentAchievements(userId, updatedAchievements);
-      setAchievements(updatedAchievements);
+      if (editingId) {
+        const { data, error } = await supabase
+          .from("achievements")
+          .update(achievementData)
+          .eq("id", editingId)
+          .eq("user_id", userId)
+          .select("*")
+          .single();
+
+        if (error) throw error;
+
+        const updatedAchievement = mapAchievement(
+          data as AchievementRow
+        );
+
+        setAchievements((previous) =>
+          previous.map((item) =>
+            item.id === editingId ? updatedAchievement : item
+          )
+        );
+      } else {
+        const { data, error } = await supabase
+          .from("achievements")
+          .insert(achievementData)
+          .select("*")
+          .single();
+
+        if (error) throw error;
+
+        const newAchievement = mapAchievement(data as AchievementRow);
+
+        setAchievements((previous) => [newAchievement, ...previous]);
+      }
+
       resetForm();
-    } catch {
+    } catch (error) {
+      console.error("Gagal menyimpan pencapaian:", error);
       setMessage(
-        "Penyimpanan gagal. Coba gunakan foto dengan ukuran lebih kecil."
+        "Penyimpanan gagal. Periksa koneksi dan konfigurasi Supabase."
       );
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -253,15 +322,12 @@ function AchievementManager({ userId }: { userId: string }) {
     );
     setMessage("");
     setShowForm(true);
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleDelete(id: string) {
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || currentUser.id !== userId) {
-      window.alert("Sesi akun tidak valid. Silakan login kembali.");
-      return;
-    }
+  async function handleDelete(id: string) {
+    if (deletingId) return;
 
     const confirmed = window.confirm(
       "Apakah kamu yakin ingin menghapus pencapaian ini?"
@@ -269,15 +335,30 @@ function AchievementManager({ userId }: { userId: string }) {
 
     if (!confirmed) return;
 
-    const updatedAchievements = achievements.filter(
-      (item) => item.id !== id || item.userId !== userId
-    );
+    setDeletingId(id);
+    setMessage("");
 
     try {
-      saveStudentAchievements(userId, updatedAchievements);
-      setAchievements(updatedAchievements);
-    } catch {
-      window.alert("Gagal menghapus pencapaian.");
+      const { error } = await supabase
+        .from("achievements")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      setAchievements((previous) =>
+        previous.filter((item) => item.id !== id)
+      );
+
+      if (editingId === id) {
+        resetForm();
+      }
+    } catch (error) {
+      console.error("Gagal menghapus pencapaian:", error);
+      setMessage("Gagal menghapus pencapaian. Silakan coba kembali.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -314,6 +395,15 @@ function AchievementManager({ userId }: { userId: string }) {
               Tambah Pencapaian
             </button>
           </div>
+
+          {message && !showForm && (
+            <p
+              role="alert"
+              className="mt-6 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+            >
+              {message}
+            </p>
+          )}
 
           <div className="mt-8 rounded-xl border border-gray-200 bg-white p-5">
             <div className="flex items-center gap-3">
@@ -461,6 +551,7 @@ function AchievementManager({ userId }: { userId: string }) {
                   {achievementImage &&
                     isValidImageDataUrl(achievementImage) && (
                       <div className="mt-4">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={achievementImage}
                           alt="Pratinjau foto pencapaian"
@@ -490,14 +581,20 @@ function AchievementManager({ userId }: { userId: string }) {
                 <div className="flex flex-wrap gap-3">
                   <button
                     type="submit"
-                    className="rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+                    disabled={saving}
+                    className="rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {editingId ? "Simpan Perubahan" : "Simpan Pencapaian"}
+                    {saving
+                      ? "Menyimpan..."
+                      : editingId
+                        ? "Simpan Perubahan"
+                        : "Simpan Pencapaian"}
                   </button>
 
                   <button
                     type="button"
                     onClick={resetForm}
+                    disabled={saving}
                     className="rounded-lg border border-gray-300 px-5 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50"
                   >
                     Batal
@@ -512,7 +609,13 @@ function AchievementManager({ userId }: { userId: string }) {
               Daftar Pencapaian
             </h2>
 
-            {achievements.length === 0 ? (
+            {loadingAchievements ? (
+              <div className="mt-4 rounded-xl border border-gray-200 bg-white px-6 py-16 text-center">
+                <p className="text-sm text-gray-500">
+                  Memuat pencapaian dari Supabase...
+                </p>
+              </div>
+            ) : achievements.length === 0 ? (
               <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center">
                 <Trophy className="mx-auto text-gray-300" size={42} />
 
@@ -533,6 +636,7 @@ function AchievementManager({ userId }: { userId: string }) {
                   >
                     {achievement.imageDataUrl &&
                     isValidImageDataUrl(achievement.imageDataUrl) ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={achievement.imageDataUrl}
                         alt={`Foto pencapaian ${achievement.title}`}
@@ -574,8 +678,9 @@ function AchievementManager({ userId }: { userId: string }) {
 
                           <button
                             type="button"
+                            disabled={deletingId === achievement.id}
                             onClick={() => handleDelete(achievement.id)}
-                            className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                            className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                             aria-label="Hapus pencapaian"
                           >
                             <Trash2 size={17} />
@@ -613,22 +718,15 @@ function AchievementManager({ userId }: { userId: string }) {
 
 export default function AchievementsPage() {
   const router = useRouter();
-
-  const userId = useSyncExternalStore(
-    subscribeToAuth,
-    getAuthSnapshot,
-    getServerAuthSnapshot
-  );
-
-  const user = userId ? getCurrentUser() : null;
+  const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (userId === null || (userId && !user)) {
+    if (!loading && !user) {
       router.replace("/login");
     }
-  }, [userId, user, router]);
+  }, [loading, user, router]);
 
-  if (userId === undefined || userId === null || !user) {
+  if (loading || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
         <p className="text-sm text-gray-500">Memuat pencapaian...</p>
@@ -636,5 +734,5 @@ export default function AchievementsPage() {
     );
   }
 
-  return <AchievementManager key={userId} userId={userId} />;
+  return <AchievementManager key={user.id} userId={user.id} />;
 }

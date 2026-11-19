@@ -5,7 +5,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type ChangeEvent,
   type FormEvent,
 } from "react";
@@ -22,12 +21,9 @@ import {
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
-import { getCurrentUser } from "@/lib/auth";
-import {
-  getStudentProfile,
-  saveStudentProfile,
-  type StudentProfile,
-} from "@/lib/profile";
+import { useAuth, type AuthUser } from "@/app/providers";
+import type { StudentProfile } from "@/lib/profile";
+import { supabase } from "@/lib/supabase";
 
 const MAX_PHOTO_SIZE = 2 * 1024 * 1024;
 
@@ -36,17 +32,6 @@ const ALLOWED_PHOTO_TYPES = [
   "image/png",
   "image/webp",
 ];
-
-const subscribeToAuth = (callback: () => void) => {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-};
-
-const getAuthSnapshot = () => {
-  return localStorage.getItem("skilltrack_current_user");
-};
-
-const getServerAuthSnapshot = () => undefined;
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -140,41 +125,33 @@ async function compressPhoto(file: File): Promise<string> {
   }
 }
 
-function ProfileForm({ userId }: { userId: string }) {
-  const [form, setForm] = useState<StudentProfile>(() => {
-    const defaultProfile: StudentProfile = {
-      userId,
-      fullName: "",
-      email: "",
-      phone: "",
-      birthPlace: "",
-      birthDate: "",
-      gender: "",
-      address: "",
-      bio: "",
-      major: "SIJA",
-      school: "SMK TI Bazma",
-      startYear: "",
-      graduationYear: "",
-      photoUrl: "",
-      updatedAt: "",
-    };
-
-    if (typeof window === "undefined") {
-      return defaultProfile;
-    }
-
-    const user = getCurrentUser();
-    const savedProfile = getStudentProfile(userId);
-
-    return (
-      savedProfile ?? {
-        ...defaultProfile,
-        fullName: user?.name ?? "",
-        email: user?.email ?? "",
-      }
-    );
+function ProfileForm({
+  userId,
+  user,
+}: {
+  userId: string;
+  user: AuthUser;
+}) {
+  const [form, setForm] = useState<StudentProfile>({
+    userId,
+    fullName: user.name,
+    email: user.email,
+    phone: "",
+    birthPlace: "",
+    birthDate: "",
+    gender: "",
+    address: "",
+    bio: "",
+    major: "SIJA",
+    school: "SMK TI Bazma",
+    startYear: "",
+    graduationYear: "",
+    photoUrl: "",
+    updatedAt: "",
   });
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">(
@@ -187,6 +164,61 @@ function ProfileForm({ userId }: { userId: string }) {
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const hasPhoto = Boolean(form.photoUrl && !photoPreviewError);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadProfile() {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!mounted) return;
+
+        if (data) {
+          setForm({
+            userId,
+            fullName: data.full_name ?? user.name,
+            email: user.email,
+            phone: data.phone ?? "",
+            birthPlace: data.birth_place ?? "",
+            birthDate: data.birth_date ?? "",
+            gender: data.gender ?? "",
+            address: data.address ?? "",
+            bio: data.bio ?? "",
+            major: data.major ?? "",
+            school: data.school ?? "",
+            startYear: data.start_year ?? "",
+            graduationYear: data.graduation_year ?? "",
+            photoUrl: data.photo_url ?? "",
+            updatedAt: data.updated_at ?? "",
+          });
+        }
+      } catch (error) {
+        console.error("Gagal memuat profil:", error);
+
+        if (mounted) {
+          setMessageType("error");
+          setMessage("Data profil gagal dimuat dari server.");
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, [userId, user.name, user.email]);
 
   function updateField(field: keyof StudentProfile, value: string) {
     setForm((previous) => ({
@@ -248,7 +280,9 @@ function ProfileForm({ userId }: { userId: string }) {
       setMessage(
         "Foto berhasil dipasang. Klik Simpan Profil untuk menyimpan perubahan."
       );
-    } catch {
+    } catch (error) {
+      console.error("Gagal memproses foto:", error);
+
       setMessageType("error");
       setMessage("Foto gagal diproses. Silakan coba gambar lain.");
     }
@@ -265,7 +299,7 @@ function ProfileForm({ userId }: { userId: string }) {
     setMessage("");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
 
@@ -275,16 +309,14 @@ function ProfileForm({ userId }: { userId: string }) {
       return;
     }
 
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || currentUser.id !== userId) {
+    if (!userId || user.id !== userId) {
       setMessageType("error");
       setMessage("Sesi akun tidak valid. Silakan login kembali.");
       return;
     }
 
     const fullName = form.fullName.trim();
-    const email = form.email.trim();
+    const email = user.email.trim();
     const photoUrl = getSafePhotoUrl(form.photoUrl);
 
     if (!fullName || !email) {
@@ -295,7 +327,7 @@ function ProfileForm({ userId }: { userId: string }) {
 
     if (!isValidEmail(email)) {
       setMessageType("error");
-      setMessage("Format email tidak valid.");
+      setMessage("Format email akun tidak valid.");
       return;
     }
 
@@ -347,32 +379,71 @@ function ProfileForm({ userId }: { userId: string }) {
       return;
     }
 
+    setIsSaving(true);
+
     try {
-      saveStudentProfile({
-        ...form,
+      const updatedAt = new Date().toISOString();
+
+      const { error } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: userId,
+            full_name: fullName,
+            phone: form.phone.trim(),
+            birth_place: form.birthPlace.trim(),
+            birth_date: form.birthDate || null,
+            gender: form.gender,
+            address: form.address.trim(),
+            bio: form.bio.trim(),
+            major: form.major.trim(),
+            school: form.school.trim(),
+            start_year: startYear,
+            graduation_year: graduationYear,
+            photo_url: photoUrl,
+            updated_at: updatedAt,
+          },
+          {
+            onConflict: "id",
+          }
+        );
+
+      if (error) throw error;
+
+      setForm((previous) => ({
+        ...previous,
         userId,
         fullName,
         email,
         photoUrl,
-        phone: form.phone.trim(),
-        birthPlace: form.birthPlace.trim(),
-        address: form.address.trim(),
-        bio: form.bio.trim(),
-        major: form.major.trim(),
-        school: form.school.trim(),
-        startYear,
-        graduationYear,
-        updatedAt: new Date().toISOString(),
-      });
+        updatedAt,
+      }));
 
       setMessageType("success");
-      setMessage("Profil berhasil disimpan.");
-    } catch {
+      setMessage("Profil berhasil disimpan ke Supabase.");
+    } catch (error) {
+      console.error("Gagal menyimpan profil:", error);
+
       setMessageType("error");
       setMessage(
-        "Profil gagal disimpan. Periksa ruang penyimpanan browser kamu."
+        "Profil gagal disimpan. Periksa koneksi dan konfigurasi Supabase."
       );
+    } finally {
+      setIsSaving(false);
     }
+  }
+
+  if (isLoading) {
+    return (
+      <>
+        <PageHeader />
+        <main className="flex min-h-[70vh] items-center justify-center bg-[#F4F7FB]">
+          <p className="text-sm text-slate-500">
+            Memuat profil...
+          </p>
+        </main>
+      </>
+    );
   }
 
   return (
@@ -528,18 +599,19 @@ function ProfileForm({ userId }: { userId: string }) {
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Email *
+                    Email Akun
                   </label>
 
                   <input
-                    required
                     type="email"
-                    maxLength={254}
-                    value={form.email}
-                    onChange={(e) => updateField("email", e.target.value)}
-                    placeholder="nama@email.com"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
+                    value={user.email}
+                    readOnly
+                    className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 outline-none"
                   />
+
+                  <p className="mt-2 text-xs text-slate-400">
+                    Ubah email melalui halaman Pengaturan Akun.
+                  </p>
                 </div>
 
                 <div>
@@ -746,10 +818,11 @@ function ProfileForm({ userId }: { userId: string }) {
             <div className="flex justify-end">
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 rounded-lg bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Save size={18} />
-                Simpan Profil
+                {isSaving ? "Menyimpan..." : "Simpan Profil"}
               </button>
             </div>
           </form>
@@ -761,26 +834,29 @@ function ProfileForm({ userId }: { userId: string }) {
 
 export default function ProfilePage() {
   const router = useRouter();
-
-  const userId = useSyncExternalStore(
-    subscribeToAuth,
-    getAuthSnapshot,
-    getServerAuthSnapshot
-  );
+  const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (userId === null) {
+    if (!loading && !user) {
       router.replace("/login");
     }
-  }, [userId, router]);
+  }, [loading, user, router]);
 
-  if (!userId) {
+  if (loading || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <p className="text-sm text-slate-500">Memuat profil...</p>
+        <p className="text-sm text-slate-500">
+          Memuat profil...
+        </p>
       </main>
     );
   }
 
-  return <ProfileForm key={userId} userId={userId} />;
+  return (
+    <ProfileForm
+      key={user.id}
+      userId={user.id}
+      user={user}
+    />
+  );
 }

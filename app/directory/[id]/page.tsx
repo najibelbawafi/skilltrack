@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Suspense, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -17,45 +17,54 @@ import {
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
-import { getRegisteredStudents } from "@/lib/auth";
-import { getStudentProfile } from "@/lib/profile";
-import { getStudentProjects } from "@/lib/projects";
-import { getStudentCertificates } from "@/lib/certificates";
-import { getStudentAchievements } from "@/lib/achievements";
-import { getPublicationSettings } from "@/lib/publication";
+import { supabase } from "@/lib/supabase";
 
-function subscribe(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener("skilltrack-publication", callback);
+type PublicProfile = {
+  id: string;
+  fullName: string;
+  major: string;
+  school: string;
+  photoUrl: string;
+  bio: string;
+  startYear: string;
+  graduationYear: string;
+};
 
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener("skilltrack-publication", callback);
-  };
-}
+type PublicProject = {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  technologies: string;
+  year: string;
+  link: string;
+};
 
-function getSnapshot() {
-  if (typeof window === "undefined") return "";
+type PublicCertificate = {
+  id: string;
+  title: string;
+  issuer: string;
+  issueDate: string;
+  description: string;
+  imageDataUrl: string;
+};
 
-  try {
-    return [
-      "skilltrack_users",
-      "skilltrack_publication",
-      "skilltrack_profiles",
-      "skilltrack_projects",
-      "skilltrack_certificates",
-      "skilltrack_achievements",
-    ]
-      .map((key) => localStorage.getItem(key) ?? "")
-      .join("|");
-  } catch {
-    return "";
-  }
-}
+type PublicAchievement = {
+  id: string;
+  title: string;
+  category: string;
+  organizer: string;
+  date: string;
+  description: string;
+  imageDataUrl: string;
+};
 
-function getServerSnapshot() {
-  return "";
-}
+type PublicPortfolio = {
+  profile: PublicProfile | null;
+  projects: PublicProject[];
+  certificates: PublicCertificate[];
+  achievements: PublicAchievement[];
+};
 
 function LoadingPage() {
   return (
@@ -67,50 +76,120 @@ function LoadingPage() {
   );
 }
 
-function StudentDetailContent() {
+function NotFoundPage() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-6">
+      <div className="max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+        <UserRound className="mx-auto mb-4 text-gray-400" size={42} />
+
+        <h1 className="text-xl font-bold text-[#25364A]">
+          Profil Tidak Ditemukan
+        </h1>
+
+        <p className="mt-2 text-sm text-gray-500">
+          Profil mungkin tidak tersedia atau sudah diatur menjadi privat.
+        </p>
+
+        <Link
+          href="/directory"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+        >
+          <ArrowLeft size={17} />
+          Kembali ke Direktori
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+export default function StudentDetailPage() {
   const params = useParams<{ id: string }>();
   const studentId = params.id;
 
-  useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const [portfolio, setPortfolio] = useState<PublicPortfolio | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const student = getRegisteredStudents().find(
-    (item) => item.id === studentId
-  );
+  useEffect(() => {
+    let mounted = true;
 
-  const isPublic = student
-    ? getPublicationSettings(student.id).isPublic
-    : false;
+    async function loadPortfolio() {
+      try {
+        setLoading(true);
+        setError("");
 
-  if (!student || !isPublic) {
+        const { data, error: fetchError } = await supabase.rpc(
+          "get_public_student_portfolio",
+          {
+            student_id: studentId,
+          }
+        );
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        if (!mounted) return;
+
+        if (!data || !data.profile) {
+          setPortfolio(null);
+          return;
+        }
+
+        setPortfolio(data as PublicPortfolio);
+      } catch (err) {
+        console.error("Gagal mengambil portofolio:", err);
+
+        if (mounted) {
+          setError("Gagal memuat portofolio. Silakan coba kembali.");
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    if (studentId) {
+      loadPortfolio();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [studentId]);
+
+  if (loading) {
+    return <LoadingPage />;
+  }
+
+  if (error) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-6">
-        <div className="max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <UserRound className="mx-auto mb-4 text-gray-400" size={42} />
-
+        <div className="max-w-md rounded-xl border border-red-200 bg-white p-8 text-center shadow-sm">
           <h1 className="text-xl font-bold text-[#25364A]">
-            Profil Tidak Ditemukan
+            Portofolio Gagal Dimuat
           </h1>
 
-          <p className="mt-2 text-sm text-gray-500">
-            Profil mungkin tidak tersedia atau sudah diatur menjadi privat.
-          </p>
+          <p className="mt-2 text-sm text-red-600">{error}</p>
 
-          <Link
-            href="/directory"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-6 rounded-lg bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
           >
-            <ArrowLeft size={17} />
-            Kembali ke Direktori
-          </Link>
+            Muat Ulang
+          </button>
         </div>
       </main>
     );
   }
 
-  const profile = getStudentProfile(studentId);
-  const projects = getStudentProjects(studentId);
-  const certificates = getStudentCertificates(studentId);
-  const achievements = getStudentAchievements(studentId);
+  if (!portfolio || !portfolio.profile) {
+    return <NotFoundPage />;
+  }
+
+  const { profile, projects, certificates, achievements } = portfolio;
 
   return (
     <main className="min-h-screen bg-[#F4F7FB]">
@@ -122,11 +201,11 @@ function StudentDetailContent() {
 
           <div className="px-6 pb-8">
             <div className="-mt-14 mb-5">
-              {profile?.photoUrl ? (
+              {profile.photoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={profile.photoUrl}
-                  alt={profile.fullName || student.name}
+                  alt={profile.fullName}
                   className="h-28 w-28 rounded-full border-4 border-white bg-white object-cover shadow-sm"
                 />
               ) : (
@@ -143,15 +222,15 @@ function StudentDetailContent() {
                 </span>
 
                 <h1 className="mt-3 text-3xl font-bold text-[#25364A]">
-                  {profile?.fullName || student.name}
+                  {profile.fullName || "Siswa"}
                 </h1>
 
                 <p className="mt-2 text-gray-600">
-                  {profile?.major || "Jurusan belum diisi"}
+                  {profile.major || "Jurusan belum diisi"}
                 </p>
 
                 <p className="mt-1 text-sm text-gray-500">
-                  {profile?.school || "Sekolah belum diisi"}
+                  {profile.school || "Sekolah belum diisi"}
                 </p>
 
                 <Link
@@ -196,7 +275,7 @@ function StudentDetailContent() {
           </h2>
 
           <p className="whitespace-pre-line text-sm leading-7 text-gray-600">
-            {profile?.bio || "Belum ada deskripsi profil."}
+            {profile.bio || "Belum ada deskripsi profil."}
           </p>
         </section>
 
@@ -208,16 +287,16 @@ function StudentDetailContent() {
 
           <div className="border-l-2 border-blue-100 pl-5">
             <h3 className="font-semibold text-[#25364A]">
-              {profile?.school || "Sekolah belum diisi"}
+              {profile.school || "Sekolah belum diisi"}
             </h3>
 
             <p className="mt-1 text-sm text-gray-600">
-              {profile?.major || "Jurusan belum diisi"}
+              {profile.major || "Jurusan belum diisi"}
             </p>
 
             <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
               <CalendarDays size={14} />
-              {profile?.startYear || "-"} – {profile?.graduationYear || "-"}
+              {profile.startYear || "-"} – {profile.graduationYear || "-"}
             </p>
           </div>
         </section>
@@ -391,13 +470,5 @@ function StudentDetailContent() {
         </div>
       </div>
     </main>
-  );
-}
-
-export default function StudentDetailPage() {
-  return (
-    <Suspense fallback={<LoadingPage />}>
-      <StudentDetailContent />
-    </Suspense>
   );
 }
