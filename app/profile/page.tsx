@@ -5,8 +5,10 @@ import {
   useEffect,
   useState,
   useSyncExternalStore,
+  type ChangeEvent,
   type FormEvent,
 } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -14,6 +16,8 @@ import {
   GraduationCap,
   FileText,
   CheckCircle2,
+  Upload,
+  X,
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
@@ -23,6 +27,14 @@ import {
   saveStudentProfile,
   type StudentProfile,
 } from "@/lib/profile";
+
+const MAX_PHOTO_SIZE = 2 * 1024 * 1024;
+
+const ALLOWED_PHOTO_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
 
 const subscribeToAuth = (callback: () => void) => {
   window.addEventListener("storage", callback);
@@ -40,10 +52,20 @@ function isValidEmail(value: string) {
 }
 
 function getSafePhotoUrl(value: string) {
-  if (!value.trim()) return "";
+  const trimmedValue = value.trim();
 
+  if (!trimmedValue) return "";
+
+  // Mendukung foto hasil upload dalam format Base64.
+  if (
+    /^data:image\/(jpeg|png|webp);base64,/i.test(trimmedValue)
+  ) {
+    return trimmedValue;
+  }
+
+  // Tetap mendukung URL gambar HTTP atau HTTPS yang sudah ada.
   try {
-    const url = new URL(value.trim());
+    const url = new URL(trimmedValue);
 
     if (url.protocol !== "https:" && url.protocol !== "http:") {
       return null;
@@ -95,17 +117,74 @@ function ProfileForm({ userId }: { userId: string }) {
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success"
   );
+  const [photoPreviewError, setPhotoPreviewError] = useState(false);
 
-  function updateField(
-    field: keyof StudentProfile,
-    value: string
-  ) {
+  function updateField(field: keyof StudentProfile, value: string) {
     setForm((previous) => ({
       ...previous,
       [field]: value,
     }));
 
+    if (field === "photoUrl") {
+      setPhotoPreviewError(false);
+    }
+
     setMessage("");
+  }
+
+  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    // Validasi format gambar.
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      setMessageType("error");
+      setMessage("Format foto harus JPG, PNG, atau WebP.");
+      event.target.value = "";
+      return;
+    }
+
+    // Validasi ukuran gambar.
+    if (file.size > MAX_PHOTO_SIZE) {
+      setMessageType("error");
+      setMessage("Ukuran foto maksimal 2 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        setMessageType("error");
+        setMessage("Foto gagal dibaca. Silakan coba kembali.");
+        return;
+      }
+
+      setForm((previous) => ({
+        ...previous,
+        photoUrl: reader.result as string,
+      }));
+
+      setPhotoPreviewError(false);
+      setMessage("");
+    };
+
+    reader.onerror = () => {
+      setMessageType("error");
+      setMessage("Foto gagal dibaca. Silakan coba kembali.");
+    };
+
+    reader.readAsDataURL(file);
+
+    // Memungkinkan pengguna memilih file yang sama kembali.
+    event.target.value = "";
+  }
+
+  function handleRemovePhoto() {
+    updateField("photoUrl", "");
+    setPhotoPreviewError(false);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -139,7 +218,7 @@ function ProfileForm({ userId }: { userId: string }) {
     if (photoUrl === null) {
       setMessageType("error");
       setMessage(
-        "URL foto harus menggunakan alamat HTTP atau HTTPS yang valid."
+        "Foto harus berupa gambar yang valid atau URL HTTP/HTTPS."
       );
       return;
     }
@@ -236,6 +315,7 @@ function ProfileForm({ userId }: { userId: string }) {
                 <div className="rounded-lg bg-blue-50 p-3 text-[#0756A5]">
                   <User size={21} />
                 </div>
+
                 <div>
                   <h2 className="font-semibold text-[#25364A]">
                     Informasi Pribadi
@@ -247,20 +327,79 @@ function ProfileForm({ userId }: { userId: string }) {
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
+                {/* Upload Foto Profil */}
                 <div className="sm:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    URL Foto Profil
+                  <label className="mb-3 block text-sm font-medium text-slate-700">
+                    Foto Profil
                   </label>
-                  <input
-                    type="text"
-                    value={form.photoUrl}
-                    onChange={(e) => updateField("photoUrl", e.target.value)}
-                    placeholder="https://example.com/foto.jpg"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
-                  />
-                  <p className="mt-2 text-xs text-slate-500">
-                    Gunakan URL gambar dengan alamat HTTP atau HTTPS.
-                  </p>
+
+                  <div className="flex flex-col gap-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 sm:flex-row sm:items-center">
+                    <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white">
+                      {form.photoUrl && !photoPreviewError ? (
+                        <Image
+                          src={form.photoUrl}
+                          alt="Preview foto profil"
+                          width={112}
+                          height={112}
+                          unoptimized
+                          onError={() => setPhotoPreviewError(true)}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <User size={42} className="text-slate-300" />
+                      )}
+                    </div>
+
+                    <div className="flex-1">
+                      <p className="font-semibold text-[#25364A]">
+                        Unggah foto profil
+                      </p>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        Pilih foto dari perangkat kamu.
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-400">
+                        JPG, PNG, atau WebP. Maksimal 2 MB.
+                      </p>
+
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <label
+                          htmlFor="profilePhoto"
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0756A5] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+                        >
+                          <Upload size={17} />
+                          Pilih Foto
+                        </label>
+
+                        <input
+                          id="profilePhoto"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handlePhotoChange}
+                          className="sr-only"
+                        />
+
+                        {form.photoUrl && (
+                          <button
+                            type="button"
+                            onClick={handleRemovePhoto}
+                            className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                          >
+                            <X size={17} />
+                            Hapus Foto
+                          </button>
+                        )}
+                      </div>
+
+                      {photoPreviewError && (
+                        <p className="mt-3 text-xs text-red-600">
+                          Foto tidak dapat ditampilkan. Silakan unggah foto
+                          baru.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -363,11 +502,13 @@ function ProfileForm({ userId }: { userId: string }) {
               </div>
             </section>
 
+            {/* Informasi Pendidikan */}
             <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-6 flex items-center gap-3">
                 <div className="rounded-lg bg-blue-50 p-3 text-[#0756A5]">
                   <GraduationCap size={21} />
                 </div>
+
                 <div>
                   <h2 className="font-semibold text-[#25364A]">
                     Informasi Pendidikan
@@ -427,7 +568,9 @@ function ProfileForm({ userId }: { userId: string }) {
                     min="1900"
                     max={new Date().getFullYear() + 10}
                     value={form.graduationYear}
-                    onChange={(e) => updateField("graduationYear", e.target.value)}
+                    onChange={(e) =>
+                      updateField("graduationYear", e.target.value)
+                    }
                     placeholder="2027"
                     className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
                   />
@@ -435,11 +578,13 @@ function ProfileForm({ userId }: { userId: string }) {
               </div>
             </section>
 
+            {/* Tentang Saya */}
             <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-6 flex items-center gap-3">
                 <div className="rounded-lg bg-blue-50 p-3 text-[#0756A5]">
                   <FileText size={21} />
                 </div>
+
                 <div>
                   <h2 className="font-semibold text-[#25364A]">
                     Tentang Saya
@@ -458,6 +603,7 @@ function ProfileForm({ userId }: { userId: string }) {
                 placeholder="Tuliskan deskripsi singkat tentang diri kamu..."
                 className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#0756A5]"
               />
+
               <p className="mt-2 text-right text-xs text-slate-400">
                 {form.bio.length}/1500 karakter
               </p>
