@@ -3,6 +3,7 @@
 
 import {
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type ChangeEvent,
@@ -45,7 +46,7 @@ const getAuthSnapshot = () => {
   return localStorage.getItem("skilltrack_current_user");
 };
 
-const getServerAuthSnapshot = () => null;
+const getServerAuthSnapshot = () => undefined;
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -56,14 +57,12 @@ function getSafePhotoUrl(value: string) {
 
   if (!trimmedValue) return "";
 
-  // Mendukung foto hasil upload dalam format Base64.
   if (
     /^data:image\/(jpeg|png|webp);base64,/i.test(trimmedValue)
   ) {
     return trimmedValue;
   }
 
-  // Tetap mendukung URL gambar HTTP atau HTTPS yang sudah ada.
   try {
     const url = new URL(trimmedValue);
 
@@ -74,6 +73,72 @@ function getSafePhotoUrl(value: string) {
     return url.href;
   } catch {
     return null;
+  }
+}
+
+async function compressPhoto(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+
+  try {
+    const maxDimension = 512;
+
+    const scale = Math.min(
+      1,
+      maxDimension / Math.max(bitmap.width, bitmap.height)
+    );
+
+    const canvas = document.createElement("canvas");
+
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Canvas tidak tersedia.");
+    }
+
+    context.drawImage(
+      bitmap,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (result) => {
+          if (result) {
+            resolve(result);
+          } else {
+            reject(new Error("Foto gagal dikompres."));
+          }
+        },
+        "image/webp",
+        0.75
+      );
+    });
+
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+        } else {
+          reject(new Error("Foto gagal dibaca."));
+        }
+      };
+
+      reader.onerror = () => {
+        reject(new Error("Foto gagal dibaca."));
+      };
+
+      reader.readAsDataURL(blob);
+    });
+  } finally {
+    bitmap.close();
   }
 }
 
@@ -117,7 +182,11 @@ function ProfileForm({ userId }: { userId: string }) {
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success"
   );
+
   const [photoPreviewError, setPhotoPreviewError] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   function updateField(field: keyof StudentProfile, value: string) {
     setForm((previous) => ({
@@ -133,63 +202,80 @@ function ProfileForm({ userId }: { userId: string }) {
   }
 
   function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
 
     if (!file) return;
 
-    // Validasi format gambar.
     if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
       setMessageType("error");
       setMessage("Format foto harus JPG, PNG, atau WebP.");
-      event.target.value = "";
+      setSelectedPhoto(null);
+      input.value = "";
       return;
     }
 
-    // Validasi ukuran gambar.
     if (file.size > MAX_PHOTO_SIZE) {
       setMessageType("error");
       setMessage("Ukuran foto maksimal 2 MB.");
-      event.target.value = "";
+      setSelectedPhoto(null);
+      input.value = "";
       return;
     }
 
-    const reader = new FileReader();
+    setSelectedPhoto(file);
 
-    reader.onload = () => {
-      if (typeof reader.result !== "string") {
-        setMessageType("error");
-        setMessage("Foto gagal dibaca. Silakan coba kembali.");
-        return;
-      }
+    setMessageType("success");
+    setMessage("Foto dipilih. Klik Unggah Foto untuk memasangnya.");
+
+    input.value = "";
+  }
+
+  async function handleUploadPhoto() {
+    if (!selectedPhoto) return;
+
+    try {
+      const compressedPhoto = await compressPhoto(selectedPhoto);
 
       setForm((previous) => ({
         ...previous,
-        photoUrl: reader.result as string,
+        photoUrl: compressedPhoto,
       }));
 
+      setSelectedPhoto(null);
       setPhotoPreviewError(false);
-      setMessage("");
-    };
 
-    reader.onerror = () => {
+      setMessageType("success");
+      setMessage(
+        "Foto berhasil dipasang. Klik Simpan Profil untuk menyimpan perubahan."
+      );
+    } catch {
       setMessageType("error");
-      setMessage("Foto gagal dibaca. Silakan coba kembali.");
-    };
-
-    reader.readAsDataURL(file);
-
-    // Memungkinkan pengguna memilih file yang sama kembali.
-    event.target.value = "";
+      setMessage("Foto gagal diproses. Silakan coba gambar lain.");
+    }
   }
 
   function handleRemovePhoto() {
-    updateField("photoUrl", "");
+    setForm((previous) => ({
+      ...previous,
+      photoUrl: "",
+    }));
+
+    setSelectedPhoto(null);
     setPhotoPreviewError(false);
+
+    setMessage("");
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+
+    if (selectedPhoto) {
+      setMessageType("error");
+      setMessage("Klik Unggah Foto terlebih dahulu sebelum menyimpan profil.");
+      return;
+    }
 
     const currentUser = getCurrentUser();
 
@@ -303,6 +389,7 @@ function ProfileForm({ userId }: { userId: string }) {
             <h1 className="text-2xl font-bold text-[#25364A]">
               Profil Saya
             </h1>
+
             <p className="mt-2 text-sm text-slate-500">
               Lengkapi informasi diri dan pendidikan untuk membangun
               profil digital kamu.
@@ -320,6 +407,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <h2 className="font-semibold text-[#25364A]">
                     Informasi Pribadi
                   </h2>
+
                   <p className="text-sm text-slate-500">
                     Informasi dasar tentang diri kamu.
                   </p>
@@ -327,7 +415,6 @@ function ProfileForm({ userId }: { userId: string }) {
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
-                {/* Upload Foto Profil */}
                 <div className="sm:col-span-2">
                   <label className="mb-3 block text-sm font-medium text-slate-700">
                     Foto Profil
@@ -363,21 +450,35 @@ function ProfileForm({ userId }: { userId: string }) {
                         JPG, PNG, atau WebP. Maksimal 2 MB.
                       </p>
 
+                      {selectedPhoto && (
+                        <p className="mt-2 text-sm font-medium text-[#0756A5]">
+                          File dipilih: {selectedPhoto.name}
+                        </p>
+                      )}
+
                       <div className="mt-4 flex flex-wrap gap-3">
-                        <label
-                          htmlFor="profilePhoto"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedPhoto) {
+                              void handleUploadPhoto();
+                            } else {
+                              photoInputRef.current?.click();
+                            }
+                          }}
                           className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0756A5] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
                         >
                           <Upload size={17} />
-                          Pilih Foto
-                        </label>
+                          {selectedPhoto ? "Unggah Foto" : "Pilih Foto"}
+                        </button>
 
                         <input
+                          ref={photoInputRef}
                           id="profilePhoto"
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
                           onChange={handlePhotoChange}
-                          className="sr-only"
+                          className="hidden"
                         />
 
                         {form.photoUrl && (
@@ -406,6 +507,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Nama Lengkap *
                   </label>
+
                   <input
                     required
                     maxLength={100}
@@ -420,6 +522,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Email *
                   </label>
+
                   <input
                     required
                     type="email"
@@ -435,6 +538,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Nomor Telepon
                   </label>
+
                   <input
                     type="tel"
                     maxLength={20}
@@ -449,6 +553,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Jenis Kelamin
                   </label>
+
                   <select
                     value={form.gender}
                     onChange={(e) => updateField("gender", e.target.value)}
@@ -464,6 +569,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Tempat Lahir
                   </label>
+
                   <input
                     maxLength={100}
                     value={form.birthPlace}
@@ -477,6 +583,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Tanggal Lahir
                   </label>
+
                   <input
                     type="date"
                     value={form.birthDate}
@@ -490,6 +597,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Alamat
                   </label>
+
                   <textarea
                     rows={3}
                     maxLength={500}
@@ -502,7 +610,6 @@ function ProfileForm({ userId }: { userId: string }) {
               </div>
             </section>
 
-            {/* Informasi Pendidikan */}
             <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-6 flex items-center gap-3">
                 <div className="rounded-lg bg-blue-50 p-3 text-[#0756A5]">
@@ -513,6 +620,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <h2 className="font-semibold text-[#25364A]">
                     Informasi Pendidikan
                   </h2>
+
                   <p className="text-sm text-slate-500">
                     Riwayat pendidikan saat ini.
                   </p>
@@ -524,6 +632,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Asal Sekolah
                   </label>
+
                   <input
                     maxLength={150}
                     value={form.school}
@@ -536,6 +645,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Jurusan
                   </label>
+
                   <input
                     maxLength={100}
                     value={form.major}
@@ -548,6 +658,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Tahun Masuk
                   </label>
+
                   <input
                     type="number"
                     min="1900"
@@ -563,6 +674,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Tahun Lulus
                   </label>
+
                   <input
                     type="number"
                     min="1900"
@@ -578,7 +690,6 @@ function ProfileForm({ userId }: { userId: string }) {
               </div>
             </section>
 
-            {/* Tentang Saya */}
             <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-6 flex items-center gap-3">
                 <div className="rounded-lg bg-blue-50 p-3 text-[#0756A5]">
@@ -589,6 +700,7 @@ function ProfileForm({ userId }: { userId: string }) {
                   <h2 className="font-semibold text-[#25364A]">
                     Tentang Saya
                   </h2>
+
                   <p className="text-sm text-slate-500">
                     Ceritakan minat, kemampuan, dan tujuan kamu.
                   </p>
