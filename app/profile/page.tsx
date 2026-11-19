@@ -57,9 +57,7 @@ function getSafePhotoUrl(value: string) {
 
   if (!trimmedValue) return "";
 
-  if (
-    /^data:image\/(jpeg|png|webp);base64,/i.test(trimmedValue)
-  ) {
+  if (/^data:image\/(jpeg|png|webp);base64,/i.test(trimmedValue)) {
     return trimmedValue;
   }
 
@@ -188,6 +186,8 @@ function ProfileForm({ userId }: { userId: string }) {
 
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  const hasPhoto = Boolean(form.photoUrl && !photoPreviewError);
+
   function updateField(field: keyof StudentProfile, value: string) {
     setForm((previous) => ({
       ...previous,
@@ -224,7 +224,6 @@ function ProfileForm({ userId }: { userId: string }) {
     }
 
     setSelectedPhoto(file);
-
     setMessageType("success");
     setMessage("Foto dipilih. Klik Unggah Foto untuk memasangnya.");
 
@@ -263,7 +262,6 @@ function ProfileForm({ userId }: { userId: string }) {
 
     setSelectedPhoto(null);
     setPhotoPreviewError(false);
-
     setMessage("");
   }
 
@@ -303,9 +301,7 @@ function ProfileForm({ userId }: { userId: string }) {
 
     if (photoUrl === null) {
       setMessageType("error");
-      setMessage(
-        "Foto harus berupa gambar yang valid atau URL HTTP/HTTPS."
-      );
+      setMessage("Foto harus berupa gambar yang valid atau URL HTTP/HTTPS.");
       return;
     }
 
@@ -399,8 +395,20 @@ function ProfileForm({ userId }: { userId: string }) {
           <form onSubmit={handleSubmit} className="space-y-6">
             <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-6 flex items-center gap-3">
-                <div className="rounded-lg bg-blue-50 p-3 text-[#0756A5]">
-                  <User size={21} />
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-blue-50 text-[#0756A5]">
+                  {hasPhoto ? (
+                    <Image
+                      src={form.photoUrl}
+                      alt="Foto profil"
+                      width={48}
+                      height={48}
+                      unoptimized
+                      onError={() => setPhotoPreviewError(true)}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <User size={21} />
+                  )}
                 </div>
 
                 <div>
@@ -421,86 +429,122 @@ function ProfileForm({ userId }: { userId: string }) {
                   </label>
 
                   <div className="flex flex-col gap-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 sm:flex-row sm:items-center">
-                    <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white">
-                      {form.photoUrl && !photoPreviewError ? (
-                        <Image
-                          src={form.photoUrl}
-                          alt="Preview foto profil"
-                          width={112}
-                          height={112}
-                          unoptimized
-                          onError={() => setPhotoPreviewError(true)}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <User size={42} className="text-slate-300" />
-                      )}
-                    </div>
+                    {hasPhoto ? (
+                      <>
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white">
+                          <Image
+                            src={form.photoUrl}
+                            alt="Preview foto profil"
+                            width={96}
+                            height={96}
+                            unoptimized
+                            onError={() => setPhotoPreviewError(true)}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
 
-                    <div className="flex-1">
-                      <p className="font-semibold text-[#25364A]">
-                        Unggah foto profil
-                      </p>
+                        <div className="flex-1">
+                          <p className="font-semibold text-[#25364A]">
+                            Foto profil terpasang
+                          </p>
 
-                      <p className="mt-1 text-sm text-slate-500">
-                        Pilih foto dari perangkat kamu.
-                      </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            Foto ini akan digunakan sebagai identitas profil kamu.
+                          </p>
 
-                      <p className="mt-1 text-xs text-slate-400">
-                        JPG, PNG, atau WebP. Maksimal 2 MB.
-                      </p>
+                          {selectedPhoto && (
+                            <p className="mt-2 text-sm font-medium text-[#0756A5]">
+                              File dipilih: {selectedPhoto.name}
+                            </p>
+                          )}
 
-                      {selectedPhoto && (
-                        <p className="mt-2 text-sm font-medium text-[#0756A5]">
-                          File dipilih: {selectedPhoto.name}
-                        </p>
-                      )}
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (selectedPhoto) {
+                                  void handleUploadPhoto();
+                                } else {
+                                  photoInputRef.current?.click();
+                                }
+                              }}
+                              className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0756A5] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+                            >
+                              <Upload size={17} />
+                              {selectedPhoto ? "Unggah Foto" : "Ganti Foto"}
+                            </button>
 
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (selectedPhoto) {
-                              void handleUploadPhoto();
-                            } else {
-                              photoInputRef.current?.click();
-                            }
-                          }}
-                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0756A5] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
-                        >
-                          <Upload size={17} />
-                          {selectedPhoto ? "Unggah Foto" : "Pilih Foto"}
-                        </button>
+                            <button
+                              type="button"
+                              onClick={handleRemovePhoto}
+                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                            >
+                              <X size={17} />
+                              Hapus Foto
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white">
+                          <User size={42} className="text-slate-300" />
+                        </div>
 
-                        <input
-                          ref={photoInputRef}
-                          id="profilePhoto"
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          onChange={handlePhotoChange}
-                          className="hidden"
-                        />
+                        <div className="flex-1">
+                          <p className="font-semibold text-[#25364A]">
+                            Unggah foto profil
+                          </p>
 
-                        {form.photoUrl && (
-                          <button
-                            type="button"
-                            onClick={handleRemovePhoto}
-                            className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                          >
-                            <X size={17} />
-                            Hapus Foto
-                          </button>
-                        )}
-                      </div>
+                          <p className="mt-1 text-sm text-slate-500">
+                            Pilih foto dari perangkat kamu.
+                          </p>
 
-                      {photoPreviewError && (
-                        <p className="mt-3 text-xs text-red-600">
-                          Foto tidak dapat ditampilkan. Silakan unggah foto
-                          baru.
-                        </p>
-                      )}
-                    </div>
+                          <p className="mt-1 text-xs text-slate-400">
+                            JPG, PNG, atau WebP. Maksimal 2 MB.
+                          </p>
+
+                          {selectedPhoto && (
+                            <p className="mt-2 text-sm font-medium text-[#0756A5]">
+                              File dipilih: {selectedPhoto.name}
+                            </p>
+                          )}
+
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (selectedPhoto) {
+                                  void handleUploadPhoto();
+                                } else {
+                                  photoInputRef.current?.click();
+                                }
+                              }}
+                              className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0756A5] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+                            >
+                              <Upload size={17} />
+                              {selectedPhoto ? "Unggah Foto" : "Pilih Foto"}
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    <input
+                      ref={photoInputRef}
+                      id="profilePhoto"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handlePhotoChange}
+                      className="hidden"
+                    />
                   </div>
+
+                  {photoPreviewError && (
+                    <p className="mt-3 text-xs text-red-600">
+                      Foto tidak dapat ditampilkan. Silakan unggah foto baru.
+                    </p>
+                  )}
                 </div>
 
                 <div>
