@@ -218,3 +218,21 @@ select:focus {
     transform: none;
   }
 }
+/* Fix warna tombol Liquid Glass yang menggunakan warna Tailwind */
+.glass-button[class~="bg-[#0756A5]"] {
+  background-color: #0756A5;
+  color: #ffffff;
+}
+
+.glass-button[class~="bg-[#0756A5]"]:hover {
+  background-color: #1e40af;
+}
+
+.glass-button[class~="bg-slate-600"] {
+  background-color: #475569;
+  color: #ffffff;
+}
+
+.glass-button[class~="bg-slate-600"]:hover {
+  background-color: #334155;
+}
