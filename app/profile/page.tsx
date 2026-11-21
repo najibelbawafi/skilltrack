@@ -1,14 +1,14 @@
 
 "use client";
-import Link from "next/link";
+
 import {
   useEffect,
   useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
+  type ReactNode,
 } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -17,11 +17,13 @@ import {
   GraduationCap,
   FileText,
   CheckCircle2,
-  Upload,
   X,
   Camera,
-  ArrowLeft,
   LoaderCircle,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Check,
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
@@ -38,7 +40,7 @@ const ALLOWED_PHOTO_TYPES = [
 ];
 
 const transition = {
-  duration: 0.45,
+  duration: 0.4,
   ease: [0.22, 1, 0.36, 1] as const,
 };
 
@@ -90,13 +92,7 @@ async function compressPhoto(file: File): Promise<string> {
       throw new Error("Canvas tidak tersedia.");
     }
 
-    context.drawImage(
-      bitmap,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
@@ -123,9 +119,7 @@ async function compressPhoto(file: File): Promise<string> {
         }
       };
 
-      reader.onerror = () => {
-        reject(new Error("Foto gagal dibaca."));
-      };
+      reader.onerror = () => reject(new Error("Foto gagal dibaca."));
 
       reader.readAsDataURL(blob);
     });
@@ -144,14 +138,18 @@ function SectionHeading({
   description: string;
 }) {
   return (
-    <div className="mb-6 flex items-center gap-3">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-[#0756A5]">
-        <Icon size={21} />
+    <div className="mb-6 flex items-start gap-3">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
+        <Icon size={21} strokeWidth={1.9} />
       </div>
 
-      <div className="min-w-0">
-        <h2 className="font-bold text-[#25364A]">{title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
+      <div className="min-w-0 pt-0.5">
+        <h2 className="text-base font-bold text-[#25364A]">
+          {title}
+        </h2>
+        <p className="mt-1 text-sm leading-5 text-slate-500">
+          {description}
+        </p>
       </div>
     </div>
   );
@@ -163,7 +161,7 @@ function Field({
   className = "",
 }: {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
@@ -177,7 +175,7 @@ function Field({
 }
 
 const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#25364A] outline-none transition-all duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70";
+  "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#25364A] outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70";
 
 function ProfileForm({
   userId,
@@ -206,6 +204,7 @@ function ProfileForm({
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">(
@@ -213,10 +212,15 @@ function ProfileForm({
   );
 
   const [photoPreviewError, setPhotoPreviewError] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  const [isCropOpen, setIsCropOpen] = useState(false);
+  const [cropSource, setCropSource] = useState("");
+  const [cropZoom, setCropZoom] = useState(1);
+  const [cropX, setCropX] = useState(50);
+  const [cropY, setCropY] = useState(50);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const cropImageRef = useRef<HTMLImageElement>(null);
 
   const hasPhoto = Boolean(form.photoUrl && !photoPreviewError);
 
@@ -262,9 +266,7 @@ function ProfileForm({
           setMessage("Data profil gagal dimuat dari server.");
         }
       } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
+        if (mounted) setIsLoading(false);
       }
     }
 
@@ -281,61 +283,45 @@ function ProfileForm({
       [field]: value,
     }));
 
-    if (field === "photoUrl") {
-      setPhotoPreviewError(false);
-    }
-
     setMessage("");
   }
 
-  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const file = input.files?.[0];
 
     if (!file) return;
 
+    input.value = "";
+
     if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
       setMessageType("error");
       setMessage("Format foto harus JPG, PNG, atau WebP.");
-      setSelectedPhoto(null);
-      input.value = "";
       return;
     }
 
     if (file.size > MAX_PHOTO_SIZE) {
       setMessageType("error");
       setMessage("Ukuran foto maksimal 2 MB.");
-      setSelectedPhoto(null);
-      input.value = "";
       return;
     }
 
-    setSelectedPhoto(file);
-    setMessageType("success");
-    setMessage("Foto dipilih. Klik Unggah Foto untuk memasangnya.");
-
-    input.value = "";
-  }
-
-  async function handleUploadPhoto() {
-    if (!selectedPhoto || isUploadingPhoto) return;
-
     setIsUploadingPhoto(true);
+    setMessage("");
 
     try {
-      const compressedPhoto = await compressPhoto(selectedPhoto);
+      const compressedPhoto = await compressPhoto(file);
 
       setForm((previous) => ({
         ...previous,
         photoUrl: compressedPhoto,
       }));
 
-      setSelectedPhoto(null);
       setPhotoPreviewError(false);
 
       setMessageType("success");
       setMessage(
-        "Foto berhasil dipasang. Klik Simpan Profil untuk menyimpan perubahan."
+        "Foto berhasil dipasang. Klik dua kali foto untuk menyesuaikan tampilannya."
       );
     } catch (error) {
       console.error("Gagal memproses foto:", error);
@@ -347,13 +333,85 @@ function ProfileForm({
     }
   }
 
+  function openCropEditor() {
+    if (!form.photoUrl || photoPreviewError) return;
+
+    setCropSource(form.photoUrl);
+    setCropZoom(1);
+    setCropX(50);
+    setCropY(50);
+    setIsCropOpen(true);
+  }
+
+  function closeCropEditor() {
+    setIsCropOpen(false);
+    setCropSource("");
+  }
+
+  function applyCrop() {
+    const image = cropImageRef.current;
+
+    if (!image || !image.naturalWidth || !image.naturalHeight) {
+      setMessageType("error");
+      setMessage("Gambar belum siap diproses.");
+      return;
+    }
+
+    const size = Math.min(image.naturalWidth, image.naturalHeight);
+    const cropSize = size / cropZoom;
+
+    const maxX = image.naturalWidth - cropSize;
+    const maxY = image.naturalHeight - cropSize;
+
+    const sourceX = (maxX * cropX) / 100;
+    const sourceY = (maxY * cropY) / 100;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 512;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      setMessageType("error");
+      setMessage("Gagal memproses bingkai foto.");
+      return;
+    }
+
+    context.drawImage(
+      image,
+      sourceX,
+      sourceY,
+      cropSize,
+      cropSize,
+      0,
+      0,
+      512,
+      512
+    );
+
+    const croppedPhoto = canvas.toDataURL("image/webp", 0.85);
+
+    setForm((previous) => ({
+      ...previous,
+      photoUrl: croppedPhoto,
+    }));
+
+    setPhotoPreviewError(false);
+    setMessageType("success");
+    setMessage(
+      "Penyesuaian foto berhasil diterapkan. Simpan profil untuk menyimpan perubahan."
+    );
+
+    closeCropEditor();
+  }
+
   function handleRemovePhoto() {
     setForm((previous) => ({
       ...previous,
       photoUrl: "",
     }));
 
-    setSelectedPhoto(null);
     setPhotoPreviewError(false);
     setMessage("");
   }
@@ -362,9 +420,9 @@ function ProfileForm({
     event.preventDefault();
     setMessage("");
 
-    if (selectedPhoto) {
+    if (isUploadingPhoto) {
       setMessageType("error");
-      setMessage("Klik Unggah Foto terlebih dahulu sebelum menyimpan profil.");
+      setMessage("Tunggu sampai pemrosesan foto selesai.");
       return;
     }
 
@@ -496,15 +554,14 @@ function ProfileForm({
     return (
       <>
         <PageHeader />
-        <main className="flex min-h-[70vh] items-center justify-center">
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass flex items-center gap-3 rounded-2xl px-6 py-4 text-sm text-slate-500"
-          >
-            <LoaderCircle size={18} className="animate-spin text-[#0756A5]" />
+        <main className="flex min-h-[70vh] items-center justify-center px-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm text-slate-500 shadow-sm">
+            <LoaderCircle
+              size={19}
+              className="animate-spin text-[#0756A5]"
+            />
             Memuat profil...
-          </motion.div>
+          </div>
         </main>
       </>
     );
@@ -514,366 +571,291 @@ function ProfileForm({
     <>
       <PageHeader />
 
-      <main className="relative min-h-screen overflow-hidden px-4 py-8 sm:px-8 sm:py-10">
-        <div className="pointer-events-none absolute -right-40 top-20 h-96 w-96 rounded-full bg-blue-200/25 blur-3xl" />
-        <div className="pointer-events-none absolute -left-40 top-[600px] h-96 w-96 rounded-full bg-sky-200/20 blur-3xl" />
-
-        <div className="relative mx-auto max-w-5xl">
-          {/* PAGE INTRO */}
+      <main className="min-h-screen bg-[#F7F9FC] px-4 py-8 sm:px-8 sm:py-10">
+        <div className="mx-auto max-w-5xl">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={transition}
-            className="mb-8"
+            className="mb-7"
           >
-            <Link
-              href="/dashboard"
-              className="mb-5 inline-flex items-center gap-2 rounded-lg text-sm font-medium text-slate-500 transition hover:text-[#0756A5]"
-            >
-              <ArrowLeft size={17} />
-              Kembali ke Dashboard
-            </Link>
-
-            <div className="glass relative overflow-hidden rounded-[26px] p-6 sm:p-8">
-              <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full bg-blue-200/30 blur-3xl" />
-
-              <div className="relative flex items-center gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0756A5] text-white shadow-lg shadow-blue-900/15">
-                  <User size={26} />
-                </div>
-
-                <div>
-                  <p className="text-[10px] font-bold tracking-[0.16em] text-[#0756A5]">
-                    PERSONAL WORKSPACE
-                  </p>
-
-                  <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#25364A] sm:text-3xl">
-                    Profil Saya
-                  </h1>
-
-                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                    Lengkapi informasi diri dan pendidikan untuk membangun
-                    profil digital yang profesional.
-                  </p>
-                </div>
-              </div>
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.12em] text-[#0756A5]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#0756A5]" />
+              PENGATURAN PROFIL
             </div>
+
+            <h1 className="text-2xl font-bold tracking-tight text-[#25364A] sm:text-3xl">
+              Profil Saya
+            </h1>
+
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              Kelola informasi pribadi dan pendidikan untuk membangun profil
+              digital yang profesional.
+            </p>
           </motion.div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* PERSONAL INFORMATION */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* INFORMASI PRIBADI */}
             <motion.section
-              initial={{ opacity: 0, y: 22 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...transition, delay: 0.08 }}
-              className="glass-card p-5 sm:p-7"
+              transition={{ ...transition, delay: 0.05 }}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
             >
-              <div className="relative z-10">
-                <SectionHeading
-                  icon={User}
-                  title="Informasi Pribadi"
-                  description="Informasi dasar tentang diri kamu."
-                />
+              <div className="mb-7 flex items-center gap-4">
+                <div className="group relative h-16 w-16 shrink-0 sm:h-[76px] sm:w-[76px]">
+                  <button
+                    type="button"
+                    onDoubleClick={openCropEditor}
+                    onClick={() => {
+                      if (!form.photoUrl) {
+                        photoInputRef.current?.click();
+                      }
+                    }}
+                    title="Klik dua kali untuk mengatur foto"
+                    className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-slate-200 bg-blue-50 text-[#0756A5] shadow-sm outline-none transition hover:border-[#0756A5] focus-visible:ring-4 focus-visible:ring-blue-100"
+                  >
+                    {hasPhoto ? (
+                      <img
+                        src={form.photoUrl}
+                        alt="Foto profil"
+                        onError={() => setPhotoPreviewError(true)}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <User size={29} />
+                    )}
+                  </button>
 
-                <div className="grid gap-5 sm:grid-cols-2">
-                  {/* PROFILE PHOTO */}
-                  <div className="sm:col-span-2">
-                    <label className="mb-3 block text-sm font-semibold text-slate-700">
-                      Foto Profil
-                    </label>
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={isUploadingPhoto}
+                    aria-label="Ganti foto profil"
+                    title="Ganti foto profil"
+                    className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#0756A5] text-white shadow-sm transition hover:bg-blue-800 disabled:opacity-60"
+                  >
+                    {isUploadingPhoto ? (
+                      <LoaderCircle size={13} className="animate-spin" />
+                    ) : (
+                      <Camera size={13} />
+                    )}
+                  </button>
 
-                    <div className="flex flex-col gap-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-5 sm:flex-row sm:items-center">
-                      <motion.div
-                        whileHover={{ scale: 1.04 }}
-                        className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-blue-50 text-[#0756A5] shadow-md"
-                      >
-                        {hasPhoto ? (
-                          <Image
-                            src={form.photoUrl}
-                            alt="Foto profil"
-                            width={96}
-                            height={96}
-                            unoptimized
-                            onError={() => setPhotoPreviewError(true)}
-                            className="h-full w-full rounded-full object-cover"
-                          />
-                        ) : (
-                          <User size={34} />
-                        )}
-
-                        <div className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#0756A5] text-white">
-                          <Camera size={13} />
-                        </div>
-                      </motion.div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-[#25364A]">
-                          {hasPhoto ? "Foto profil kamu" : "Tambahkan foto profil"}
-                        </p>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                          JPG, PNG, atau WebP. Ukuran maksimal 2 MB.
-                        </p>
-
-                        {selectedPhoto && (
-                          <p className="mt-2 break-all text-xs font-medium text-[#0756A5]">
-                            File dipilih: {selectedPhoto.name}
-                          </p>
-                        )}
-
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <motion.button
-                            type="button"
-                            whileTap={{ scale: 0.96 }}
-                            onClick={() => {
-                              if (selectedPhoto) {
-                                void handleUploadPhoto();
-                              } else {
-                                photoInputRef.current?.click();
-                              }
-                            }}
-                            disabled={isUploadingPhoto}
-                            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0756A5] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-900/10 transition hover:bg-blue-800 disabled:opacity-60"
-                          >
-                            {isUploadingPhoto ? (
-                              <LoaderCircle size={16} className="animate-spin" />
-                            ) : (
-                              <Upload size={16} />
-                            )}
-
-                            {isUploadingPhoto
-                              ? "Memproses..."
-                              : selectedPhoto
-                                ? "Unggah Foto"
-                                : hasPhoto
-                                  ? "Ganti Foto"
-                                  : "Pilih Foto"}
-                          </motion.button>
-
-                          {hasPhoto && (
-                            <motion.button
-                              type="button"
-                              whileTap={{ scale: 0.96 }}
-                              onClick={handleRemovePhoto}
-                              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                            >
-                              <X size={16} />
-                              Hapus Foto
-                            </motion.button>
-                          )}
-                        </div>
-
-                        <input
-                          ref={photoInputRef}
-                          id="profilePhoto"
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          onChange={handlePhotoChange}
-                          className="hidden"
-                        />
-
-                        {photoPreviewError && (
-                          <p className="mt-3 text-xs text-red-600">
-                            Foto tidak dapat ditampilkan. Silakan unggah foto baru.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <Field label="Nama Lengkap *">
-                    <input
-                      required
-                      maxLength={100}
-                      value={form.fullName}
-                      onChange={(e) => updateField("fullName", e.target.value)}
-                      placeholder="Masukkan nama lengkap"
-                      className={inputClass}
-                    />
-                  </Field>
-
-                  <Field label="Email Akun">
-                    <input
-                      type="email"
-                      value={user.email}
-                      readOnly
-                      className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 outline-none"
-                    />
-
-                    <p className="mt-2 text-xs text-slate-400">
-                      Ubah email melalui halaman Pengaturan Akun.
-                    </p>
-                  </Field>
-
-                  <Field label="Nomor Telepon">
-                    <input
-                      type="tel"
-                      maxLength={20}
-                      value={form.phone}
-                      onChange={(e) => updateField("phone", e.target.value)}
-                      placeholder="08xxxxxxxxxx"
-                      className={inputClass}
-                    />
-                  </Field>
-
-                  <Field label="Jenis Kelamin">
-                    <select
-                      value={form.gender}
-                      onChange={(e) => updateField("gender", e.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="">Pilih jenis kelamin</option>
-                      <option value="Laki-laki">Laki-laki</option>
-                      <option value="Perempuan">Perempuan</option>
-                    </select>
-                  </Field>
-
-                  <Field label="Tempat Lahir">
-                    <input
-                      maxLength={100}
-                      value={form.birthPlace}
-                      onChange={(e) => updateField("birthPlace", e.target.value)}
-                      placeholder="Kota kelahiran"
-                      className={inputClass}
-                    />
-                  </Field>
-
-                  <Field label="Tanggal Lahir">
-                    <input
-                      type="date"
-                      value={form.birthDate}
-                      onChange={(e) => updateField("birthDate", e.target.value)}
-                      max={new Date().toISOString().split("T")[0]}
-                      className={inputClass}
-                    />
-                  </Field>
-
-                  <Field label="Alamat" className="sm:col-span-2">
-                    <textarea
-                      rows={3}
-                      maxLength={500}
-                      value={form.address}
-                      onChange={(e) => updateField("address", e.target.value)}
-                      placeholder="Masukkan alamat"
-                      className={`${inputClass} resize-y`}
-                    />
-                  </Field>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
                 </div>
+
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold text-[#25364A]">
+                    Informasi Pribadi
+                  </h2>
+                  <p className="mt-1 text-sm leading-5 text-slate-500">
+                    Informasi dasar tentang diri kamu.
+                  </p>
+                  <p className="mt-1.5 text-xs text-slate-400">
+                    {isUploadingPhoto
+                      ? "Memproses foto..."
+                      : hasPhoto
+                        ? "Klik dua kali foto untuk menyesuaikan bingkai."
+                        : "Pilih foto melalui ikon kamera."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label="Nama Lengkap *">
+                  <input
+                    required
+                    maxLength={100}
+                    value={form.fullName}
+                    onChange={(e) => updateField("fullName", e.target.value)}
+                    placeholder="Masukkan nama lengkap"
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Email Akun">
+                  <input
+                    type="email"
+                    value={user.email}
+                    readOnly
+                    className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 outline-none"
+                  />
+                  <p className="mt-2 text-xs text-slate-400">
+                    Ubah email melalui halaman Pengaturan Akun.
+                  </p>
+                </Field>
+
+                <Field label="Nomor Telepon">
+                  <input
+                    type="tel"
+                    maxLength={20}
+                    value={form.phone}
+                    onChange={(e) => updateField("phone", e.target.value)}
+                    placeholder="08xxxxxxxxxx"
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Jenis Kelamin">
+                  <select
+                    value={form.gender}
+                    onChange={(e) => updateField("gender", e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Pilih jenis kelamin</option>
+                    <option value="Laki-laki">Laki-laki</option>
+                    <option value="Perempuan">Perempuan</option>
+                  </select>
+                </Field>
+
+                <Field label="Tempat Lahir">
+                  <input
+                    maxLength={100}
+                    value={form.birthPlace}
+                    onChange={(e) => updateField("birthPlace", e.target.value)}
+                    placeholder="Kota kelahiran"
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Tanggal Lahir">
+                  <input
+                    type="date"
+                    value={form.birthDate}
+                    onChange={(e) => updateField("birthDate", e.target.value)}
+                    max={new Date().toISOString().split("T")[0]}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Alamat" className="sm:col-span-2">
+                  <textarea
+                    rows={3}
+                    maxLength={500}
+                    value={form.address}
+                    onChange={(e) => updateField("address", e.target.value)}
+                    placeholder="Masukkan alamat"
+                    className={`${inputClass} resize-y`}
+                  />
+                </Field>
               </div>
             </motion.section>
 
-            {/* EDUCATION */}
+            {/* INFORMASI PENDIDIKAN */}
             <motion.section
-              initial={{ opacity: 0, y: 22 }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...transition, delay: 0.1 }}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
+            >
+              <SectionHeading
+                icon={GraduationCap}
+                title="Informasi Pendidikan"
+                description="Riwayat pendidikan saat ini."
+              />
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label="Asal Sekolah">
+                  <input
+                    maxLength={150}
+                    value={form.school}
+                    onChange={(e) => updateField("school", e.target.value)}
+                    placeholder="Nama sekolah"
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Jurusan">
+                  <input
+                    maxLength={100}
+                    value={form.major}
+                    onChange={(e) => updateField("major", e.target.value)}
+                    placeholder="Jurusan"
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Tahun Masuk">
+                  <input
+                    type="number"
+                    min="1900"
+                    max={new Date().getFullYear() + 10}
+                    value={form.startYear}
+                    onChange={(e) => updateField("startYear", e.target.value)}
+                    placeholder="2024"
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Tahun Lulus">
+                  <input
+                    type="number"
+                    min="1900"
+                    max={new Date().getFullYear() + 10}
+                    value={form.graduationYear}
+                    onChange={(e) =>
+                      updateField("graduationYear", e.target.value)
+                    }
+                    placeholder="2027"
+                    className={inputClass}
+                  />
+                </Field>
+              </div>
+            </motion.section>
+
+            {/* TENTANG SAYA */}
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...transition, delay: 0.15 }}
-              className="glass-card p-5 sm:p-7"
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
             >
-              <div className="relative z-10">
-                <SectionHeading
-                  icon={GraduationCap}
-                  title="Informasi Pendidikan"
-                  description="Riwayat pendidikan saat ini."
-                />
+              <SectionHeading
+                icon={FileText}
+                title="Tentang Saya"
+                description="Ceritakan minat, kemampuan, dan tujuan kamu."
+              />
 
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <Field label="Asal Sekolah">
-                    <input
-                      maxLength={150}
-                      value={form.school}
-                      onChange={(e) => updateField("school", e.target.value)}
-                      className={inputClass}
-                    />
-                  </Field>
+              <textarea
+                rows={5}
+                maxLength={1500}
+                value={form.bio}
+                onChange={(e) => updateField("bio", e.target.value)}
+                placeholder="Tuliskan deskripsi singkat tentang diri kamu..."
+                className={`${inputClass} resize-y`}
+              />
 
-                  <Field label="Jurusan">
-                    <input
-                      maxLength={100}
-                      value={form.major}
-                      onChange={(e) => updateField("major", e.target.value)}
-                      className={inputClass}
-                    />
-                  </Field>
-
-                  <Field label="Tahun Masuk">
-                    <input
-                      type="number"
-                      min="1900"
-                      max={new Date().getFullYear() + 10}
-                      value={form.startYear}
-                      onChange={(e) => updateField("startYear", e.target.value)}
-                      placeholder="2024"
-                      className={inputClass}
-                    />
-                  </Field>
-
-                  <Field label="Tahun Lulus">
-                    <input
-                      type="number"
-                      min="1900"
-                      max={new Date().getFullYear() + 10}
-                      value={form.graduationYear}
-                      onChange={(e) =>
-                        updateField("graduationYear", e.target.value)
-                      }
-                      placeholder="2027"
-                      className={inputClass}
-                    />
-                  </Field>
-                </div>
-              </div>
+              <p className="mt-2 text-right text-xs text-slate-400">
+                {form.bio.length}/1500 karakter
+              </p>
             </motion.section>
 
-            {/* BIO */}
-            <motion.section
-              initial={{ opacity: 0, y: 22 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...transition, delay: 0.22 }}
-              className="glass-card p-5 sm:p-7"
-            >
-              <div className="relative z-10">
-                <SectionHeading
-                  icon={FileText}
-                  title="Tentang Saya"
-                  description="Ceritakan minat, kemampuan, dan tujuan kamu."
-                />
-
-                <textarea
-                  rows={5}
-                  maxLength={1500}
-                  value={form.bio}
-                  onChange={(e) => updateField("bio", e.target.value)}
-                  placeholder="Tuliskan deskripsi singkat tentang diri kamu..."
-                  className={`${inputClass} resize-y`}
-                />
-
-                <p className="mt-2 text-right text-xs text-slate-400">
-                  {form.bio.length}/1500 karakter
-                </p>
-              </div>
-            </motion.section>
-
-            {/* FEEDBACK */}
+            {/* NOTIFIKASI */}
             <AnimatePresence mode="wait">
               {message && (
                 <motion.div
                   key={message}
-                  initial={{ opacity: 0, y: -8, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: "auto" }}
-                  exit={{ opacity: 0, y: -8, height: 0 }}
-                  transition={{ duration: 0.22 }}
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
                   role="status"
-                  className={`flex items-start gap-3 overflow-hidden rounded-2xl border p-4 text-sm ${
+                  className={`flex items-start gap-3 rounded-xl border p-4 text-sm ${
                     messageType === "success"
-                      ? "border-emerald-200 bg-emerald-50/90 text-emerald-700"
-                      : "border-red-200 bg-red-50/90 text-red-700"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-red-200 bg-red-50 text-red-700"
                   }`}
                 >
-                  {messageType === "success" && (
+                  {messageType === "success" ? (
                     <CheckCircle2 size={19} className="mt-0.5 shrink-0" />
-                  )}
-
-                  {messageType === "error" && (
+                  ) : (
                     <X size={19} className="mt-0.5 shrink-0" />
                   )}
 
@@ -882,23 +864,16 @@ function ProfileForm({
               )}
             </AnimatePresence>
 
-            {/* SAVE BUTTON */}
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...transition, delay: 0.28 }}
-              className="glass sticky bottom-4 z-20 flex items-center justify-between gap-3 rounded-2xl p-3 shadow-xl shadow-slate-900/5 sm:p-4"
-            >
+            {/* SIMPAN PROFIL */}
+            <div className="sticky bottom-4 z-20 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-900/5 backdrop-blur-xl sm:p-4">
               <p className="hidden text-xs text-slate-500 sm:block">
                 Pastikan informasi profil sudah benar.
               </p>
 
-              <motion.button
+              <button
                 type="submit"
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.97 }}
                 disabled={isSaving || isUploadingPhoto}
-                className="ml-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/15 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="ml-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSaving ? (
                   <LoaderCircle size={18} className="animate-spin" />
@@ -907,11 +882,184 @@ function ProfileForm({
                 )}
 
                 {isSaving ? "Menyimpan..." : "Simpan Profil"}
-              </motion.button>
-            </motion.div>
+              </button>
+            </div>
           </form>
         </div>
       </main>
+
+      {/* EDITOR FOTO PROFIL */}
+      <AnimatePresence>
+        {isCropOpen && cropSource && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                closeCropEditor();
+              }
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.2 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="crop-title"
+              className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                <div>
+                  <h2
+                    id="crop-title"
+                    className="font-bold text-[#25364A]"
+                  >
+                    Sesuaikan Foto Profil
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Atur gambar agar sesuai dengan bingkai.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeCropEditor}
+                  aria-label="Tutup editor"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                >
+                  <X size={19} />
+                </button>
+              </div>
+
+              <div className="p-5">
+                <div className="mx-auto aspect-square w-full max-w-[280px] overflow-hidden rounded-full border-4 border-slate-200 bg-slate-100 shadow-inner">
+                  <img
+                    ref={cropImageRef}
+                    src={cropSource}
+                    alt="Pratinjau penyesuaian foto"
+                    draggable={false}
+                    className="h-full w-full select-none object-cover"
+                    style={{
+                      objectPosition: `${cropX}% ${cropY}%`,
+                      transform: `scale(${cropZoom})`,
+                    }}
+                  />
+                </div>
+
+                <p className="mt-4 text-center text-xs text-slate-400">
+                  Pratinjau berbentuk lingkaran. Hasil akan dipotong menjadi
+                  gambar persegi yang sesuai dengan bingkai profil.
+                </p>
+
+                <div className="mt-6 space-y-5">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="text-sm font-semibold text-slate-700">
+                        Perbesar / perkecil
+                      </label>
+                      <span className="text-xs font-medium text-slate-500">
+                        {cropZoom.toFixed(1)}x
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <ZoomOut size={17} className="shrink-0 text-slate-400" />
+                      <input
+                        type="range"
+                        min="1"
+                        max="3"
+                        step="0.05"
+                        value={cropZoom}
+                        onChange={(e) =>
+                          setCropZoom(Number(e.target.value))
+                        }
+                        className="w-full accent-[#0756A5]"
+                      />
+                      <ZoomIn size={17} className="shrink-0 text-slate-400" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="text-sm font-semibold text-slate-700">
+                        Posisi horizontal
+                      </label>
+                      <span className="text-xs text-slate-400">
+                        {Math.round(cropX)}%
+                      </span>
+                    </div>
+
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={cropX}
+                      onChange={(e) => setCropX(Number(e.target.value))}
+                      className="w-full accent-[#0756A5]"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="text-sm font-semibold text-slate-700">
+                        Posisi vertikal
+                      </label>
+                      <span className="text-xs text-slate-400">
+                        {Math.round(cropY)}%
+                      </span>
+                    </div>
+
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={cropY}
+                      onChange={(e) => setCropY(Number(e.target.value))}
+                      className="w-full accent-[#0756A5]"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCropZoom(1);
+                      setCropX(50);
+                      setCropY(50);
+                    }}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <RotateCcw size={16} />
+                    Atur Ulang
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={closeCropEditor}
+                    className="ml-auto min-h-11 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    Batal
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={applyCrop}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0756A5] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+                  >
+                    <Check size={16} />
+                    Terapkan
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -928,15 +1076,14 @@ export default function ProfilePage() {
 
   if (loading || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass flex items-center gap-3 rounded-2xl px-6 py-4 text-sm text-slate-500"
-        >
-          <LoaderCircle size={18} className="animate-spin text-[#0756A5]" />
+      <main className="flex min-h-screen items-center justify-center px-4">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm text-slate-500 shadow-sm">
+          <LoaderCircle
+            size={19}
+            className="animate-spin text-[#0756A5]"
+          />
           Memuat profil...
-        </motion.div>
+        </div>
       </main>
     );
   }
