@@ -2,17 +2,20 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowLeft,
+  ArrowRight,
   Mail,
   Lock,
   Eye,
   EyeOff,
   GraduationCap,
-  ArrowRight,
+  ChartNoAxesCombined,
+  FolderKanban,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -65,52 +68,120 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#F4F7FB] px-5 py-12">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-32 -top-32 h-80 w-80 rounded-full bg-blue-200/40 blur-3xl" />
-        <div className="absolute -bottom-40 -right-24 h-96 w-96 rounded-full bg-sky-200/40 blur-3xl" />
-        <div className="absolute right-1/3 top-1/3 h-56 w-56 rounded-full bg-white/70 blur-3xl" />
-      </div>
+    <main className="min-h-screen bg-white lg:grid lg:grid-cols-2">
+      {/* Panel branding */}
+      <section className="relative hidden min-h-screen flex-col justify-between overflow-hidden bg-[#0756A5] p-12 text-white lg:flex xl:p-16">
+        <div className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full border border-white/10" />
+        <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full border border-white/10" />
+        <div className="pointer-events-none absolute -bottom-40 -left-20 h-96 w-96 rounded-full bg-white/[0.05] blur-3xl" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 22, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.55, ease: "easeOut" }}
-        className="relative z-10 w-full max-w-md"
-      >
-        <Link
-          href="/"
-          className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/55 px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm backdrop-blur-xl transition hover:-translate-x-1 hover:text-[#0756A5]"
-        >
-          <ArrowLeft size={16} />
-          Kembali ke Beranda
+        <Link href="/" className="relative z-10 flex items-center gap-3">
+          <Image
+            src="/skilltrack-icon.svg"
+            alt="SkillTrack"
+            width={44}
+            height={44}
+            priority
+            className="rounded-xl"
+          />
+          <span className="text-xl font-bold tracking-tight">
+            SkillTrack
+          </span>
         </Link>
 
-        <div className="glass-card relative overflow-hidden p-7 sm:p-10">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white/70 to-transparent" />
+        <div className="relative z-10 max-w-lg">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <p className="mb-5 text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
+              Student Portfolio Platform
+            </p>
 
-          <div className="relative">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.12, duration: 0.4 }}
-              className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/80 bg-gradient-to-br from-white to-blue-50 text-[#0756A5] shadow-lg shadow-blue-900/5"
-            >
-              <GraduationCap size={32} strokeWidth={1.8} />
-            </motion.div>
+            <h1 className="text-4xl font-bold leading-tight tracking-tight xl:text-5xl">
+              Bangun portofolio.
+              <br />
+              Tunjukkan potensimu.
+            </h1>
 
-            <div className="mb-8 text-center">
-              <p className="mb-2 text-xs font-semibold tracking-[0.2em] text-[#0756A5]">
+            <p className="mt-6 max-w-md text-base leading-8 text-blue-100">
+              Dokumentasikan pengalaman, keterampilan, dan pencapaianmu
+              dalam satu platform yang terorganisir.
+            </p>
+
+            <div className="mt-12 space-y-5">
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
+                  <FolderKanban size={20} />
+                </div>
+                <div>
+                  <p className="font-semibold">Kelola portofolio</p>
+                  <p className="mt-1 text-sm text-blue-200">
+                    Simpan proyek dan pengalamanmu.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
+                  <ChartNoAxesCombined size={20} />
+                </div>
+                <div>
+                  <p className="font-semibold">Pantau perkembangan</p>
+                  <p className="mt-1 text-sm text-blue-200">
+                    Dokumentasikan kompetensi dan pencapaian.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        <p className="relative z-10 text-xs text-blue-200">
+          © 2026 SkillTrack. Student Portfolio Platform.
+        </p>
+      </section>
+
+      {/* Form login */}
+      <section className="flex min-h-screen flex-col justify-center px-5 py-10 sm:px-10 lg:px-14 xl:px-24">
+        <div className="mx-auto w-full max-w-md">
+          <Link
+            href="/"
+            className="mb-12 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-[#0756A5]"
+          >
+            <ArrowLeft size={17} />
+            Kembali ke Beranda
+          </Link>
+
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+          >
+            <div className="mb-9 lg:hidden">
+              <Image
+                src="/skilltrack-icon.svg"
+                alt="Logo SkillTrack"
+                width={54}
+                height={54}
+                priority
+                className="rounded-xl"
+              />
+            </div>
+
+            <div className="mb-9">
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-[#0756A5]">
                 SKILLTRACK
               </p>
 
-              <h1 className="text-2xl font-bold tracking-tight text-[#25364A] sm:text-3xl">
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
                 Selamat Datang
-              </h1>
+              </h2>
 
-              <p className="mx-auto mt-3 max-w-xs text-sm leading-6 text-slate-500">
-                Masuk ke akun SkillTrack untuk mengelola portofolio dan
-                perkembangan kompetensimu.
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Masuk ke akunmu untuk melanjutkan pengelolaan portofolio
+                dan perkembangan kompetensi.
               </p>
             </div>
 
@@ -120,15 +191,14 @@ export default function LoginPage() {
                   htmlFor="email"
                   className="mb-2 block text-sm font-semibold text-slate-700"
                 >
-                  Email Address
+                  Alamat Email
                 </label>
 
-                <div className="group flex items-center rounded-xl border border-slate-200/90 bg-white/85 px-4 transition-all duration-200 focus-within:border-[#0756A5] focus-within:ring-4 focus-within:ring-blue-100">
+                <div className="flex items-center rounded-xl border border-slate-200 bg-white px-4 transition focus-within:border-[#0756A5] focus-within:ring-4 focus-within:ring-blue-50">
                   <Mail
                     size={18}
-                    className="shrink-0 text-slate-400 transition-colors group-focus-within:text-[#0756A5]"
+                    className="shrink-0 text-slate-400"
                   />
-
                   <input
                     id="email"
                     type="email"
@@ -140,7 +210,7 @@ export default function LoginPage() {
                     placeholder="nama@email.com"
                     autoComplete="email"
                     required
-                    className="w-full bg-transparent px-3 py-3.5 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    className="w-full bg-transparent px-3.5 py-3.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
                   />
                 </div>
               </div>
@@ -153,12 +223,11 @@ export default function LoginPage() {
                   Password
                 </label>
 
-                <div className="group flex items-center rounded-xl border border-slate-200/90 bg-white/85 px-4 transition-all duration-200 focus-within:border-[#0756A5] focus-within:ring-4 focus-within:ring-blue-100">
+                <div className="flex items-center rounded-xl border border-slate-200 bg-white px-4 transition focus-within:border-[#0756A5] focus-within:ring-4 focus-within:ring-blue-50">
                   <Lock
                     size={18}
-                    className="shrink-0 text-slate-400 transition-colors group-focus-within:text-[#0756A5]"
+                    className="shrink-0 text-slate-400"
                   />
-
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
@@ -170,7 +239,7 @@ export default function LoginPage() {
                     placeholder="Masukkan password"
                     autoComplete="current-password"
                     required
-                    className="w-full bg-transparent px-3 py-3.5 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    className="w-full bg-transparent px-3.5 py-3.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
                   />
 
                   <button
@@ -213,9 +282,9 @@ export default function LoginPage() {
               <motion.button
                 type="submit"
                 disabled={loading}
-                whileHover={loading ? undefined : { y: -2 }}
-                whileTap={loading ? undefined : { scale: 0.98 }}
-                className="glass-button flex w-full items-center justify-center gap-2 rounded-xl bg-[#0756A5] py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/10 transition hover:bg-[#064783] disabled:cursor-not-allowed disabled:opacity-60"
+                whileHover={loading ? undefined : { y: -1 }}
+                whileTap={loading ? undefined : { scale: 0.99 }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0756A5] py-3.5 text-sm font-semibold text-white shadow-sm shadow-blue-900/10 transition hover:bg-[#064783] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? (
                   <>
@@ -231,10 +300,10 @@ export default function LoginPage() {
               </motion.button>
             </form>
 
-            <div className="my-7 flex items-center gap-4">
-              <div className="h-px flex-1 bg-slate-200/80" />
+            <div className="my-8 flex items-center gap-4">
+              <div className="h-px flex-1 bg-slate-200" />
               <span className="text-xs text-slate-400">ATAU</span>
-              <div className="h-px flex-1 bg-slate-200/80" />
+              <div className="h-px flex-1 bg-slate-200" />
             </div>
 
             <p className="text-center text-sm text-slate-500">
@@ -246,13 +315,13 @@ export default function LoginPage() {
                 Buat Akun
               </Link>
             </p>
-          </div>
-        </div>
+          </motion.div>
 
-        <p className="mt-7 text-center text-xs text-slate-400">
-          © 2026 SkillTrack. Student Portfolio Platform.
-        </p>
-      </motion.div>
+          <p className="mt-12 text-center text-xs text-slate-400 lg:hidden">
+            © 2026 SkillTrack. Student Portfolio Platform.
+          </p>
+        </div>
+      </section>
     </main>
   );
 }

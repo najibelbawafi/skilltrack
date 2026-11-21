@@ -1,6 +1,7 @@
 
 "use client";
 
+import Image from "next/image";
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -678,9 +679,21 @@ export default function PublicCVPage({
             Kembali ke Direktori
           </Link>
 
-          <span className="rounded-full border border-green-100 bg-green-50/90 px-3 py-1.5 text-xs font-semibold text-green-700">
-            CV Publik
-          </span>
+          <Link
+            href="/"
+            aria-label="SkillTrack - Home"
+            className="inline-flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-[#0756A5] transition hover:text-blue-800"
+          >
+            <Image
+              src="/skilltrack-icon.svg"
+              alt=""
+              width={34}
+              height={34}
+              priority
+              className="rounded-lg"
+            />
+            <span>SkillTrack</span>
+          </Link>
         </div>
       </motion.header>
 

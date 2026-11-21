@@ -17,7 +17,9 @@ import {
   X,
   Code2,
   CalendarDays,
-  Layers3,
+  LoaderCircle,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
@@ -56,15 +58,18 @@ const initialForm: ProjectForm = {
 };
 
 const transition = {
-  duration: 0.45,
+  duration: 0.35,
   ease: [0.22, 1, 0.36, 1] as const,
 };
+
+const inputClass =
+  "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#25364A] outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70";
 
 function getSafeExternalUrl(value: string): string | null {
   if (!value.trim()) return null;
 
   try {
-    const url = new URL(value);
+    const url = new URL(value.trim());
 
     if (url.protocol !== "https:" && url.protocol !== "http:") {
       return null;
@@ -95,10 +100,13 @@ function ProjectsManager({ userId }: { userId: string }) {
   const [form, setForm] = useState<ProjectForm>(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -107,23 +115,32 @@ function ProjectsManager({ userId }: { userId: string }) {
       setLoadingProjects(true);
       setErrorMessage("");
 
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from("projects")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false });
 
-      if (!active) return;
+        if (error) throw error;
 
-      if (error) {
-        setErrorMessage("Gagal memuat proyek. Silakan coba kembali.");
-        setLoadingProjects(false);
-        return;
+        if (!active) return;
+
+        const rows = (data ?? []) as ProjectRow[];
+        setProjects(rows.map(mapProject));
+      } catch (error) {
+        console.error("Gagal memuat proyek:", error);
+
+        if (active) {
+          setErrorMessage(
+            "Gagal memuat proyek. Periksa koneksi dan coba kembali."
+          );
+        }
+      } finally {
+        if (active) {
+          setLoadingProjects(false);
+        }
       }
-
-      const rows = (data ?? []) as ProjectRow[];
-      setProjects(rows.map(mapProject));
-      setLoadingProjects(false);
     }
 
     loadProjects();
@@ -146,6 +163,16 @@ function ProjectsManager({ userId }: { userId: string }) {
     setShowForm(false);
   }
 
+  function openNewForm() {
+    setForm(initialForm);
+    setEditingId(null);
+    setShowForm(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -154,7 +181,7 @@ function ProjectsManager({ userId }: { userId: string }) {
     const trimmedLink = form.link.trim();
 
     if (trimmedLink && !getSafeExternalUrl(trimmedLink)) {
-      window.alert(
+      setErrorMessage(
         "Link proyek tidak valid. Gunakan alamat yang diawali https:// atau http://."
       );
       return;
@@ -170,8 +197,20 @@ function ProjectsManager({ userId }: { userId: string }) {
       link: trimmedLink,
     };
 
+    if (
+      !projectData.title ||
+      !projectData.category ||
+      !projectData.description ||
+      !projectData.technologies ||
+      !projectData.year
+    ) {
+      setErrorMessage("Lengkapi seluruh informasi proyek terlebih dahulu.");
+      return;
+    }
+
     setSaving(true);
     setErrorMessage("");
+    setSuccessMessage("");
 
     try {
       if (editingId) {
@@ -192,6 +231,8 @@ function ProjectsManager({ userId }: { userId: string }) {
             project.id === editingId ? updatedProject : project
           )
         );
+
+        setSuccessMessage("Proyek berhasil diperbarui.");
       } else {
         const { data, error } = await supabase
           .from("projects")
@@ -204,11 +245,14 @@ function ProjectsManager({ userId }: { userId: string }) {
         const newProject = mapProject(data as ProjectRow);
 
         setProjects((previous) => [newProject, ...previous]);
+
+        setSuccessMessage("Proyek berhasil ditambahkan.");
       }
 
       resetForm();
     } catch (error) {
       console.error("Gagal menyimpan proyek:", error);
+
       setErrorMessage(
         "Proyek gagal disimpan. Periksa koneksi dan konfigurasi Supabase."
       );
@@ -229,6 +273,8 @@ function ProjectsManager({ userId }: { userId: string }) {
 
     setEditingId(project.id);
     setShowForm(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -240,6 +286,7 @@ function ProjectsManager({ userId }: { userId: string }) {
 
     setDeletingId(projectId);
     setErrorMessage("");
+    setSuccessMessage("");
 
     try {
       const { error } = await supabase
@@ -257,6 +304,8 @@ function ProjectsManager({ userId }: { userId: string }) {
       if (editingId === projectId) {
         resetForm();
       }
+
+      setSuccessMessage("Proyek berhasil dihapus.");
     } catch (error) {
       console.error("Gagal menghapus proyek:", error);
       setErrorMessage("Proyek gagal dihapus. Silakan coba kembali.");
@@ -269,130 +318,141 @@ function ProjectsManager({ userId }: { userId: string }) {
     <>
       <PageHeader />
 
-      <main className="min-h-screen bg-[#F4F7FB]">
-        <div className="mx-auto max-w-6xl px-5 py-8 md:px-10 md:py-10">
+      <main className="min-h-screen bg-[#F7F9FC] px-4 py-8 sm:px-8 sm:py-10">
+        <div className="mx-auto max-w-6xl">
+          {/* HEADER */}
           <motion.section
-            initial={{ opacity: 0, y: 18 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={transition}
-            className="glass-strong relative overflow-hidden rounded-[28px] p-6 md:p-8"
+            className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"
           >
-            <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-blue-200/30 blur-3xl" />
-
-            <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
-              <div>
-                <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-[#0756A5]">
-                  <FolderKanban size={15} />
-                  PORTOFOLIO SISWA
-                </div>
-
-                <h1 className="mt-3 text-2xl font-bold tracking-tight text-[#25364A] md:text-3xl">
-                  Proyek Saya
-                </h1>
-
-                <p className="mt-2 max-w-lg text-sm leading-6 text-gray-500">
-                  Kelola dan dokumentasikan proyek yang pernah kamu kerjakan
-                  dalam satu tempat.
-                </p>
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.12em] text-[#0756A5]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0756A5]" />
+                PORTOFOLIO SISWA
               </div>
 
-              <motion.button
-                type="button"
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => {
-                  resetForm();
-                  setShowForm(true);
-                }}
-                className="glass-button inline-flex items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/10 transition-colors hover:bg-blue-800"
-              >
-                <Plus size={18} />
-                Tambah Proyek
-              </motion.button>
+              <h1 className="text-2xl font-bold tracking-tight text-[#25364A] sm:text-3xl">
+                Proyek Saya
+              </h1>
+
+              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                Kelola dan dokumentasikan proyek yang pernah kamu kerjakan
+                dalam satu tempat.
+              </p>
             </div>
+
+            <button
+              type="button"
+              onClick={openNewForm}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 active:scale-[0.98]"
+            >
+              <Plus size={18} />
+              Tambah Proyek
+            </button>
           </motion.section>
 
+          {/* NOTIFIKASI */}
           <AnimatePresence>
-            {errorMessage && (
+            {(errorMessage || successMessage) && (
               <motion.div
                 initial={{ opacity: 0, height: 0, y: -8 }}
                 animate={{ opacity: 1, height: "auto", y: 0 }}
                 exit={{ opacity: 0, height: 0, y: -8 }}
-                role="alert"
-                className="mt-5 overflow-hidden rounded-2xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm text-red-600"
+                role={errorMessage ? "alert" : "status"}
+                className={`mb-5 flex items-start gap-3 overflow-hidden rounded-xl border px-4 py-3 text-sm ${
+                  errorMessage
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                }`}
               >
-                {errorMessage}
+                {errorMessage ? (
+                  <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                ) : (
+                  <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+                )}
+
+                <p>{errorMessage || successMessage}</p>
               </motion.div>
             )}
           </AnimatePresence>
 
+          {/* FORM */}
           <AnimatePresence>
             {showForm && (
               <motion.section
                 key="project-form"
-                initial={{ opacity: 0, y: 18, scale: 0.985 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -12, scale: 0.985 }}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
                 transition={transition}
-                className="glass-strong mt-7 rounded-[26px] p-5 md:p-8"
+                className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
               >
-                <div className="mb-7 flex items-center justify-between gap-4">
+                <div className="mb-7 flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold tracking-wider text-[#0756A5]">
+                    <p className="text-xs font-semibold tracking-[0.12em] text-[#0756A5]">
                       {editingId ? "PERBARUI DATA" : "PROYEK BARU"}
                     </p>
 
-                    <h2 className="mt-1 text-xl font-bold text-[#25364A]">
+                    <h2 className="mt-2 text-xl font-bold text-[#25364A]">
                       {editingId ? "Edit Proyek" : "Tambah Proyek Baru"}
                     </h2>
 
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-slate-500">
                       Lengkapi informasi proyek yang ingin ditampilkan.
                     </p>
                   </div>
 
-                  <motion.button
+                  <button
                     type="button"
-                    whileHover={{ rotate: 90 }}
-                    whileTap={{ scale: 0.9 }}
                     onClick={resetForm}
                     aria-label="Tutup formulir"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 bg-white/70 text-gray-500 transition-colors hover:bg-white hover:text-gray-800"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
                   >
-                    <X size={20} />
-                  </motion.button>
+                    <X size={19} />
+                  </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-[#34465B]">
+                    <label
+                      htmlFor="project-title"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
                       Nama Proyek *
                     </label>
 
                     <input
+                      id="project-title"
                       required
+                      maxLength={150}
                       value={form.title}
                       onChange={(event) =>
                         updateField("title", event.target.value)
                       }
                       placeholder="Contoh: Smart Feeder IoT"
-                      className="w-full rounded-xl border border-gray-200 bg-white/85 px-4 py-3 text-sm text-[#25364A] outline-none transition-all placeholder:text-gray-400 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70"
+                      className={inputClass}
                     />
                   </div>
 
-                  <div className="grid gap-5 md:grid-cols-2">
+                  <div className="grid gap-5 sm:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#34465B]">
+                      <label
+                        htmlFor="project-category"
+                        className="mb-2 block text-sm font-semibold text-slate-700"
+                      >
                         Kategori *
                       </label>
 
                       <select
+                        id="project-category"
                         required
                         value={form.category}
                         onChange={(event) =>
                           updateField("category", event.target.value)
                         }
-                        className="w-full rounded-xl border border-gray-200 bg-white/85 px-4 py-3 text-sm text-[#25364A] outline-none transition-all focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70"
+                        className={inputClass}
                       >
                         <option value="">Pilih kategori</option>
                         <option value="Web Development">Web Development</option>
@@ -405,11 +465,15 @@ function ProjectsManager({ userId }: { userId: string }) {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#34465B]">
+                      <label
+                        htmlFor="project-year"
+                        className="mb-2 block text-sm font-semibold text-slate-700"
+                      >
                         Tahun Pengerjaan *
                       </label>
 
                       <input
+                        id="project-year"
                         required
                         type="number"
                         min="2000"
@@ -418,164 +482,176 @@ function ProjectsManager({ userId }: { userId: string }) {
                         onChange={(event) =>
                           updateField("year", event.target.value)
                         }
-                        className="w-full rounded-xl border border-gray-200 bg-white/85 px-4 py-3 text-sm text-[#25364A] outline-none transition-all focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70"
+                        className={inputClass}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-[#34465B]">
+                    <label
+                      htmlFor="project-description"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
                       Deskripsi Proyek *
                     </label>
 
                     <textarea
+                      id="project-description"
                       required
                       rows={4}
+                      maxLength={3000}
                       value={form.description}
                       onChange={(event) =>
                         updateField("description", event.target.value)
                       }
                       placeholder="Jelaskan tujuan, cara kerja, dan hasil proyek..."
-                      className="w-full resize-y rounded-xl border border-gray-200 bg-white/85 px-4 py-3 text-sm leading-6 text-[#25364A] outline-none transition-all placeholder:text-gray-400 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70"
+                      className={`${inputClass} resize-y leading-6`}
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-[#34465B]">
+                    <label
+                      htmlFor="project-technologies"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
                       Teknologi yang Digunakan *
                     </label>
 
                     <input
+                      id="project-technologies"
                       required
+                      maxLength={500}
                       value={form.technologies}
                       onChange={(event) =>
                         updateField("technologies", event.target.value)
                       }
                       placeholder="Contoh: ESP32, Arduino IDE, C++"
-                      className="w-full rounded-xl border border-gray-200 bg-white/85 px-4 py-3 text-sm text-[#25364A] outline-none transition-all placeholder:text-gray-400 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70"
+                      className={inputClass}
                     />
 
-                    <p className="mt-2 text-xs text-gray-400">
+                    <p className="mt-2 text-xs text-slate-400">
                       Pisahkan beberapa teknologi menggunakan koma.
                     </p>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-[#34465B]">
-                      Link Proyek (Opsional)
+                    <label
+                      htmlFor="project-link"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Link Proyek
+                      <span className="ml-2 font-normal text-slate-400">
+                        (Opsional)
+                      </span>
                     </label>
 
                     <input
+                      id="project-link"
                       type="url"
                       value={form.link}
                       onChange={(event) =>
                         updateField("link", event.target.value)
                       }
                       placeholder="https://github.com/username/project"
-                      className="w-full rounded-xl border border-gray-200 bg-white/85 px-4 py-3 text-sm text-[#25364A] outline-none transition-all placeholder:text-gray-400 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70"
+                      className={inputClass}
                     />
 
-                    <p className="mt-2 text-xs text-gray-400">
+                    <p className="mt-2 text-xs text-slate-400">
                       Gunakan alamat yang diawali https:// atau http://.
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap gap-3 border-t border-gray-200/70 pt-5">
-                    <motion.button
+                  <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row">
+                    <button
                       type="submit"
                       disabled={saving}
-                      whileHover={!saving ? { y: -2 } : undefined}
-                      whileTap={!saving ? { scale: 0.97 } : undefined}
-                      className="rounded-xl bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/10 transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
+                      {saving ? (
+                        <LoaderCircle size={17} className="animate-spin" />
+                      ) : (
+                        <CheckCircle2 size={17} />
+                      )}
+
                       {saving
                         ? "Menyimpan..."
                         : editingId
                           ? "Simpan Perubahan"
                           : "Simpan Proyek"}
-                    </motion.button>
+                    </button>
 
-                    <motion.button
+                    <button
                       type="button"
                       disabled={saving}
-                      whileHover={!saving ? { y: -2 } : undefined}
-                      whileTap={!saving ? { scale: 0.97 } : undefined}
                       onClick={resetForm}
-                      className="rounded-xl border border-gray-200 bg-white/70 px-6 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-white disabled:opacity-50"
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
                     >
                       Batal
-                    </motion.button>
+                    </button>
                   </div>
                 </form>
               </motion.section>
             )}
           </AnimatePresence>
 
-          <section className="mt-9">
+          {/* DAFTAR PROYEK */}
+          <section>
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-[#25364A]">
                   Daftar Proyek
                 </h2>
-                <p className="mt-1 text-sm text-gray-500">
+
+                <p className="mt-1 text-sm text-slate-500">
                   Semua proyek yang sudah kamu dokumentasikan.
                 </p>
               </div>
 
-              <div className="glass inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-[#0756A5]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-[#0756A5]">
                 <FolderKanban size={15} />
                 {projects.length} Proyek
               </div>
             </div>
 
             {loadingProjects ? (
-              <div className="glass-strong rounded-[24px] px-6 py-16 text-center">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 1.2,
-                    repeat: Infinity,
-                    ease: "linear",
-                  }}
-                  className="mx-auto h-7 w-7 rounded-full border-2 border-blue-100 border-t-[#0756A5]"
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-16">
+                <LoaderCircle
+                  size={27}
+                  className="animate-spin text-[#0756A5]"
                 />
-                <p className="mt-4 text-sm text-gray-500">
-                  Memuat proyek dari Supabase...
+
+                <p className="mt-4 text-sm text-slate-500">
+                  Memuat proyek...
                 </p>
               </div>
             ) : projects.length === 0 ? (
               <motion.div
-                initial={{ opacity: 0, y: 15 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={transition}
-                className="glass-strong rounded-[26px] border border-dashed border-gray-300/80 px-6 py-16 text-center"
+                className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center"
               >
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-[#0756A5]">
-                  <FolderKanban size={29} />
+                  <FolderKanban size={28} strokeWidth={1.8} />
                 </div>
 
-                <h3 className="mt-5 font-semibold text-[#25364A]">
+                <h3 className="mt-5 font-bold text-[#25364A]">
                   Belum Ada Proyek
                 </h3>
 
-                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-500">
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
                   Tambahkan proyek yang pernah kamu kerjakan untuk membangun
                   portofolio digital.
                 </p>
 
-                <motion.button
+                <button
                   type="button"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => {
-                    resetForm();
-                    setShowForm(true);
-                  }}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/10 hover:bg-blue-800"
+                  onClick={openNewForm}
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
                 >
                   <Plus size={17} />
                   Tambah Proyek Pertama
-                </motion.button>
+                </button>
               </motion.div>
             ) : (
               <motion.div
@@ -590,94 +666,100 @@ function ProjectsManager({ userId }: { userId: string }) {
                       <motion.article
                         key={project.id}
                         layout
-                        initial={{ opacity: 0, y: 18, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.97 }}
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.97 }}
                         transition={{
                           ...transition,
-                          delay: Math.min(index * 0.045, 0.2),
+                          delay: Math.min(index * 0.04, 0.16),
                         }}
-                        whileHover={{ y: -4 }}
-                        className="glass-card flex flex-col rounded-[24px] p-6"
+                        whileHover={{ y: -3 }}
+                        className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md sm:p-6"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <span className="inline-flex rounded-full bg-blue-50/90 px-3 py-1 text-xs font-semibold text-[#0756A5]">
+                            <span className="inline-flex max-w-full rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-[#0756A5]">
                               {project.category}
                             </span>
 
-                            <h3 className="mt-4 break-words text-lg font-bold text-[#25364A]">
+                            <h3 className="mt-4 break-words text-lg font-bold leading-snug text-[#25364A]">
                               {project.title}
                             </h3>
 
-                            <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-400">
-                              <CalendarDays size={13} />
+                            <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-400">
+                              <CalendarDays size={14} />
                               Tahun {project.year}
                             </div>
                           </div>
 
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/80 bg-blue-50/80 text-[#0756A5] shadow-sm">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
                             <FolderKanban size={21} />
                           </div>
                         </div>
 
-                        <p className="mt-5 flex-1 whitespace-pre-wrap break-words text-sm leading-7 text-gray-600">
+                        <p className="mt-5 flex-1 whitespace-pre-wrap break-words text-sm leading-7 text-slate-600">
                           {project.description}
                         </p>
 
-                        <div className="mt-5 rounded-xl border border-white/80 bg-white/55 p-4">
-                          <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-gray-500">
-                            <Code2 size={14} />
+                        <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                          <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-500">
+                            <Code2 size={15} />
                             TEKNOLOGI
                           </div>
 
-                          <p className="mt-2 break-words text-sm leading-6 text-gray-700">
+                          <p className="mt-2 break-words text-sm leading-6 text-slate-700">
                             {project.technologies}
                           </p>
                         </div>
 
-                        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200/70 pt-4">
+                        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
                           {safeProjectLink ? (
                             <a
                               href={safeProjectLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0756A5] transition-colors hover:text-blue-800"
+                              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0756A5] transition hover:text-blue-800"
                             >
                               Lihat Proyek
                               <ExternalLink size={15} />
                             </a>
                           ) : (
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-slate-400">
                               {project.link
                                 ? "Link tidak valid"
                                 : "Tidak ada link"}
                             </span>
                           )}
 
-                          <div className="flex items-center gap-3">
-                            <motion.button
+                          <div className="flex items-center gap-4">
+                            <button
                               type="button"
-                              whileTap={{ scale: 0.92 }}
                               onClick={() => handleEdit(project)}
-                              className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-[#0756A5]"
+                              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-[#0756A5]"
                             >
                               <Pencil size={15} />
                               Edit
-                            </motion.button>
+                            </button>
 
-                            <motion.button
+                            <button
                               type="button"
                               disabled={deletingId === project.id}
-                              whileTap={{ scale: 0.92 }}
                               onClick={() => handleDelete(project.id)}
-                              className="inline-flex items-center gap-1.5 text-sm font-medium text-red-500 transition-colors hover:text-red-700 disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 text-sm font-medium text-red-500 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              <Trash2 size={15} />
+                              {deletingId === project.id ? (
+                                <LoaderCircle
+                                  size={15}
+                                  className="animate-spin"
+                                />
+                              ) : (
+                                <Trash2 size={15} />
+                              )}
+
                               {deletingId === project.id
                                 ? "Menghapus..."
                                 : "Hapus"}
-                            </motion.button>
+                            </button>
                           </div>
                         </div>
                       </motion.article>
@@ -705,18 +787,13 @@ export default function ProjectsPage() {
 
   if (loading || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <div className="text-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{
-              duration: 1.2,
-              repeat: Infinity,
-              ease: "linear",
-            }}
-            className="mx-auto h-7 w-7 rounded-full border-2 border-blue-100 border-t-[#0756A5]"
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F9FC] px-4">
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 text-sm text-slate-500 shadow-sm">
+          <LoaderCircle
+            size={19}
+            className="animate-spin text-[#0756A5]"
           />
-          <p className="mt-4 text-sm text-gray-500">Memuat proyek...</p>
+          Memuat proyek...
         </div>
       </main>
     );

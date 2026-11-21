@@ -1,8 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -16,30 +15,60 @@ import {
   ShieldCheck,
   Globe,
   EyeOff as PrivateIcon,
-  Trash2,
-  AlertTriangle,
+  LoaderCircle,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
 import { useAuth } from "@/app/providers";
 import { supabase } from "@/lib/supabase";
 
-function SettingsForm({
-  user,
-}: {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
-}) {
-  const router = useRouter();
+type SettingsUser = {
+  id: string;
+  name: string;
+  email: string;
+};
 
+const inputClass =
+  "w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-[#25364A] outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70";
+
+function SectionHeading({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof User;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mb-6 flex items-start gap-3">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
+        <Icon size={21} strokeWidth={1.9} />
+      </div>
+
+      <div className="min-w-0">
+        <h2 className="text-base font-bold text-[#25364A]">
+          {title}
+        </h2>
+        <p className="mt-1 text-sm leading-5 text-slate-500">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function SettingsForm({ user }: { user: SettingsUser }) {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
@@ -49,6 +78,7 @@ function SettingsForm({
   const [publicationLoaded, setPublicationLoaded] = useState(false);
   const [publicationSaving, setPublicationSaving] = useState(false);
   const [publicationMessage, setPublicationMessage] = useState("");
+  const [publicationError, setPublicationError] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -70,8 +100,9 @@ function SettingsForm({
         console.error("Gagal memuat publikasi:", error);
 
         if (mounted) {
+          setPublicationError(true);
           setPublicationMessage(
-            "Pengaturan publikasi gagal dimuat."
+            "Pengaturan publikasi gagal dimuat. Silakan muat ulang halaman."
           );
         }
       } finally {
@@ -89,7 +120,7 @@ function SettingsForm({
   }, [user.id]);
 
   async function handlePublicationToggle() {
-    if (publicationSaving) return;
+    if (publicationSaving || publicationError) return;
 
     setPublicationSaving(true);
     setPublicationMessage("");
@@ -113,11 +144,17 @@ function SettingsForm({
       if (error) throw error;
 
       setIsPublic(nextValue);
+      setPublicationMessage(
+        nextValue
+          ? "Portofolio sekarang dapat ditemukan di Direktori Siswa."
+          : "Portofolio sekarang bersifat privat."
+      );
     } catch (error) {
       console.error("Gagal menyimpan publikasi:", error);
 
+      setPublicationError(false);
       setPublicationMessage(
-        "Gagal menyimpan perubahan publikasi."
+        "Gagal menyimpan perubahan publikasi. Silakan coba kembali."
       );
     } finally {
       setPublicationSaving(false);
@@ -138,6 +175,11 @@ function SettingsForm({
       return;
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setMessage("Format email tidak valid.");
+      return;
+    }
+
     if (!currentPassword) {
       setMessage("Masukkan password saat ini untuk konfirmasi.");
       return;
@@ -151,7 +193,6 @@ function SettingsForm({
     setIsSaving(true);
 
     try {
-      // Verifikasi password akun yang sedang digunakan.
       const { error: verificationError } =
         await supabase.auth.signInWithPassword({
           email: user.email,
@@ -190,7 +231,6 @@ function SettingsForm({
         throw updateError;
       }
 
-      // Sinkronkan nama ke tabel profil Supabase.
       const { error: profileError } = await supabase
         .from("profiles")
         .update({
@@ -240,322 +280,410 @@ function SettingsForm({
 
   if (!publicationLoaded) {
     return (
-      <main className="min-h-screen bg-[#F4F7FB]">
+      <>
         <PageHeader />
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <p className="text-sm text-gray-500">
+        <main className="flex min-h-[70vh] items-center justify-center bg-[#F7F9FC] px-4">
+          <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 text-sm text-slate-500 shadow-sm">
+            <LoaderCircle
+              size={19}
+              className="animate-spin text-[#0756A5]"
+            />
             Memuat pengaturan...
-          </p>
-        </div>
-      </main>
+          </div>
+        </main>
+      </>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#F4F7FB]">
+    <>
       <PageHeader />
 
-      <section className="mx-auto max-w-4xl px-6 py-10">
-        <div className="mb-8">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#0756A5]">
-            <Settings size={17} />
-            PENGATURAN AKUN
-          </div>
-
-          <h1 className="text-3xl font-bold text-[#25364A]">
-            Pengaturan Akun
-          </h1>
-
-          <p className="mt-2 text-sm text-gray-500">
-            Kelola informasi akun, keamanan, dan privasi portofolio SkillTrack.
-          </p>
-        </div>
-
-        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm md:p-8">
-          <div className="mb-5 flex items-start gap-3">
-            <div className="rounded-lg bg-blue-50 p-3 text-[#0756A5]">
-              <ShieldCheck size={22} />
+      <main className="min-h-screen bg-[#F7F9FC] px-4 py-8 sm:px-8 sm:py-10">
+        <div className="mx-auto max-w-4xl">
+          {/* HEADER */}
+          <div className="mb-8">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.12em] text-[#0756A5]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#0756A5]" />
+              PENGATURAN AKUN
             </div>
 
-            <div>
-              <h2 className="text-lg font-bold text-[#25364A]">
-                Privasi Portofolio
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Atur apakah portofoliomu dapat ditemukan oleh pengunjung
-                Direktori Siswa.
-              </p>
-            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-[#25364A] sm:text-3xl">
+              Pengaturan Akun
+            </h1>
+
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              Kelola informasi akun, keamanan, dan privasi portofolio
+              SkillTrack.
+            </p>
           </div>
 
-          <div className="flex flex-col justify-between gap-4 rounded-lg border border-gray-200 p-4 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-3">
-              {isPublic ? (
-                <Globe size={22} className="text-green-600" />
-              ) : (
-                <PrivateIcon size={22} className="text-gray-500" />
+          <div className="space-y-5">
+            {/* PRIVASI PORTOFOLIO */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+              <SectionHeading
+                icon={ShieldCheck}
+                title="Privasi Portofolio"
+                description="Atur visibilitas profilmu di Direktori Siswa."
+              />
+
+              <div className="flex flex-col justify-between gap-5 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:p-5">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                      isPublic
+                        ? "bg-emerald-50 text-emerald-600"
+                        : "bg-slate-200 text-slate-600"
+                    }`}
+                  >
+                    {isPublic ? (
+                      <Globe size={21} />
+                    ) : (
+                      <PrivateIcon size={21} />
+                    )}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold text-[#25364A]">
+                        {isPublic
+                          ? "Portofolio Publik"
+                          : "Portofolio Privat"}
+                      </h3>
+
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                          isPublic
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {isPublic ? "PUBLIK" : "PRIVAT"}
+                      </span>
+                    </div>
+
+                    <p className="mt-1 text-sm leading-5 text-slate-500">
+                      {isPublic
+                        ? "Profilmu dapat ditemukan oleh pengunjung Direktori Siswa."
+                        : "Profilmu tidak ditampilkan di Direktori Siswa."}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePublicationToggle}
+                  disabled={publicationSaving || publicationError}
+                  className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    isPublic
+                      ? "bg-slate-700 hover:bg-slate-800"
+                      : "bg-[#0756A5] hover:bg-blue-800"
+                  }`}
+                >
+                  {publicationSaving ? (
+                    <LoaderCircle size={16} className="animate-spin" />
+                  ) : null}
+
+                  {publicationSaving
+                    ? "Menyimpan..."
+                    : isPublic
+                      ? "Jadikan Privat"
+                      : "Jadikan Publik"}
+                </button>
+              </div>
+
+              {publicationMessage && (
+                <p
+                  role="status"
+                  className={`mt-3 text-sm ${
+                    publicationError
+                      ? "text-red-600"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {publicationMessage}
+                </p>
               )}
 
-              <div>
-                <p className="font-semibold text-[#25364A]">
-                  {isPublic ? "Portofolio Publik" : "Portofolio Privat"}
-                </p>
+              <p className="mt-4 text-xs leading-5 text-slate-400">
+                Pengaturan ini juga berlaku pada fitur publikasi di halaman
+                Preview Portofolio.
+              </p>
+            </section>
 
-                <p className="mt-1 text-xs text-gray-500">
-                  {isPublic
-                    ? "Profilmu dapat ditemukan di Direktori Siswa."
-                    : "Profilmu tidak ditampilkan di Direktori Siswa."}
-                </p>
+            {/* INFORMASI AKUN */}
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
+            >
+              <div>
+                <SectionHeading
+                  icon={User}
+                  title="Informasi Akun"
+                  description="Perbarui identitas dan alamat email akunmu."
+                />
+
+                <div className="space-y-5">
+                  <div>
+                    <label
+                      htmlFor="name"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Nama Lengkap
+                    </label>
+
+                    <div className="relative">
+                      <User
+                        size={18}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        id="name"
+                        type="text"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        maxLength={100}
+                        required
+                        placeholder="Masukkan nama lengkap"
+                        autoComplete="name"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="email"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Alamat Email
+                    </label>
+
+                    <div className="relative">
+                      <Mail
+                        size={18}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        id="email"
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        required
+                        autoComplete="email"
+                        placeholder="nama@email.com"
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      Perubahan email mungkin memerlukan konfirmasi melalui
+                      email baru.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-6">
+                <SectionHeading
+                  icon={Lock}
+                  title="Keamanan Akun"
+                  description="Verifikasi identitas sebelum mengubah informasi akun."
+                />
+
+                <div className="space-y-5">
+                  <div>
+                    <label
+                      htmlFor="currentPassword"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Password Saat Ini
+                    </label>
+
+                    <div className="relative">
+                      <Lock
+                        size={18}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        id="currentPassword"
+                        type={showCurrentPassword ? "text" : "password"}
+                        value={currentPassword}
+                        onChange={(event) =>
+                          setCurrentPassword(event.target.value)
+                        }
+                        required
+                        autoComplete="current-password"
+                        placeholder="Masukkan password saat ini"
+                        className={`${inputClass} pr-12`}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowCurrentPassword(!showCurrentPassword)
+                        }
+                        aria-label={
+                          showCurrentPassword
+                            ? "Sembunyikan password"
+                            : "Tampilkan password"
+                        }
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#0756A5]"
+                      >
+                        {showCurrentPassword ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="newPassword"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Password Baru
+                      <span className="ml-2 font-normal text-slate-400">
+                        (Opsional)
+                      </span>
+                    </label>
+
+                    <div className="relative">
+                      <Lock
+                        size={18}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        id="newPassword"
+                        type={showNewPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(event) =>
+                          setNewPassword(event.target.value)
+                        }
+                        minLength={8}
+                        autoComplete="new-password"
+                        placeholder="Minimal 8 karakter"
+                        className={`${inputClass} pr-12`}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowNewPassword(!showNewPassword)
+                        }
+                        aria-label={
+                          showNewPassword
+                            ? "Sembunyikan password baru"
+                            : "Tampilkan password baru"
+                        }
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#0756A5]"
+                      >
+                        {showNewPassword ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+
+                    <p className="mt-2 text-xs text-slate-400">
+                      Kosongkan jika tidak ingin mengganti password.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* NOTIFIKASI */}
+              {message && (
+                <div
+                  role="status"
+                  className={`flex items-start gap-3 rounded-xl border p-4 text-sm ${
+                    isSuccess
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-red-200 bg-red-50 text-red-700"
+                  }`}
+                >
+                  {isSuccess ? (
+                    <CheckCircle2
+                      size={19}
+                      className="mt-0.5 shrink-0"
+                    />
+                  ) : (
+                    <AlertCircle
+                      size={19}
+                      className="mt-0.5 shrink-0"
+                    />
+                  )}
+
+                  <p>{message}</p>
+                </div>
+              )}
+
+              {/* TOMBOL AKSI */}
+              <div className="flex flex-col gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center">
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSaving ? (
+                    <LoaderCircle
+                      size={18}
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <Save size={18} />
+                  )}
+
+                  {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+                </button>
+
+                <Link
+                  href="/dashboard"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-[#0756A5]"
+                >
+                  Batal
+                </Link>
+              </div>
+            </form>
+
+            {/* INFORMASI TAMBAHAN */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
+                  <ShieldCheck size={20} />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-[#25364A]">
+                    Keamanan dan Privasi
+                  </h3>
+
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Pastikan informasi akun selalu diperbarui. Jangan
+                    membagikan password kepada orang lain.
+                  </p>
+
+                  <Link
+                    href="/profile"
+                    className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[#0756A5] transition hover:text-blue-800"
+                  >
+                    Periksa Profil Saya
+                    <ArrowRight size={16} />
+                  </Link>
+                </div>
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={handlePublicationToggle}
-              disabled={publicationSaving}
-              className={`rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                isPublic
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-[#0756A5] hover:bg-blue-800"
-              }`}
-            >
-              {publicationSaving
-                ? "Menyimpan..."
-                : isPublic
-                  ? "Jadikan Privat"
-                  : "Jadikan Publik"}
-            </button>
           </div>
-
-          {publicationMessage && (
-            <p className="mt-3 text-sm text-red-600">
-              {publicationMessage}
-            </p>
-          )}
-
-          <p className="mt-4 text-xs text-gray-400">
-            Pengaturan ini juga berlaku pada fitur publikasi di halaman
-            Preview Portofolio.
-          </p>
         </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm md:p-8"
-        >
-          <div>
-            <h2 className="text-lg font-bold text-[#25364A]">
-              Informasi Akun
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Perbarui nama dan alamat email akunmu.
-            </p>
-          </div>
-
-          <div>
-            <label
-              htmlFor="name"
-              className="mb-2 block text-sm font-medium text-gray-700"
-            >
-              Nama Lengkap
-            </label>
-
-            <div className="relative">
-              <User
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                required
-                className="w-full rounded-lg border border-gray-300 py-3 pl-10 pr-4 text-sm text-gray-800 outline-none focus:border-[#0756A5] focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-2 block text-sm font-medium text-gray-700"
-            >
-              Email
-            </label>
-
-            <div className="relative">
-              <Mail
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-                className="w-full rounded-lg border border-gray-300 py-3 pl-10 pr-4 text-sm text-gray-800 outline-none focus:border-[#0756A5] focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-          </div>
-
-          <div className="border-t border-gray-100 pt-6">
-            <h2 className="text-lg font-bold text-[#25364A]">
-              Keamanan Akun
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Masukkan password saat ini untuk mengonfirmasi perubahan.
-            </p>
-          </div>
-
-          <div>
-            <label
-              htmlFor="currentPassword"
-              className="mb-2 block text-sm font-medium text-gray-700"
-            >
-              Password Saat Ini
-            </label>
-
-            <div className="relative">
-              <Lock
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-
-              <input
-                id="currentPassword"
-                type={showPassword ? "text" : "password"}
-                value={currentPassword}
-                onChange={(event) =>
-                  setCurrentPassword(event.target.value)
-                }
-                required
-                autoComplete="current-password"
-                placeholder="Masukkan password saat ini"
-                className="w-full rounded-lg border border-gray-300 py-3 pl-10 pr-12 text-sm text-gray-800 outline-none focus:border-[#0756A5] focus:ring-2 focus:ring-blue-100"
-              />
-
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                aria-label={
-                  showPassword
-                    ? "Sembunyikan password"
-                    : "Tampilkan password"
-                }
-              >
-                {showPassword ? (
-                  <EyeOff size={18} />
-                ) : (
-                  <Eye size={18} />
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="newPassword"
-              className="mb-2 block text-sm font-medium text-gray-700"
-            >
-              Password Baru
-              <span className="ml-2 font-normal text-gray-400">
-                (Opsional)
-              </span>
-            </label>
-
-            <input
-              id="newPassword"
-              type="password"
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              minLength={8}
-              autoComplete="new-password"
-              placeholder="Minimal 8 karakter"
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-800 outline-none focus:border-[#0756A5] focus:ring-2 focus:ring-blue-100"
-            />
-
-            <p className="mt-2 text-xs text-gray-400">
-              Kosongkan jika tidak ingin mengganti password.
-            </p>
-          </div>
-
-          {message && (
-            <div
-              className={`rounded-lg px-4 py-3 text-sm ${
-                isSuccess
-                  ? "bg-green-50 text-green-700"
-                  : "bg-red-50 text-red-700"
-              }`}
-            >
-              {message}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-3 border-t border-gray-100 pt-6 sm:flex-row">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Save size={17} />
-              {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
-            </button>
-
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
-            >
-              Batal
-            </Link>
-          </div>
-        </form>
-
-        <div className="mt-6 rounded-xl border border-red-200 bg-white p-6 shadow-sm md:p-8">
-          <div className="mb-4 flex items-start gap-3">
-            <div className="rounded-lg bg-red-50 p-3 text-red-600">
-              <AlertTriangle size={22} />
-            </div>
-
-            <div>
-              <h2 className="text-lg font-bold text-red-700">
-                Hapus Akun
-              </h2>
-
-              <p className="mt-1 text-sm text-gray-500">
-                Penghapusan akun akan menghapus data profil, proyek,
-                sertifikat, pencapaian, dan pengaturan publikasi akun ini.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm font-semibold text-amber-800">
-              Penghapusan akun sementara belum tersedia.
-            </p>
-
-            <p className="mt-1 text-xs leading-5 text-amber-700">
-              Fitur ini membutuhkan proses penghapusan yang aman melalui
-              backend Supabase. Akun dan data tidak akan dihapus dari
-              browser secara langsung.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            disabled
-            className="mt-4 inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-400"
-          >
-            <Trash2 size={17} />
-            Hapus Akun Saya
-          </button>
-        </div>
-      </section>
-    </main>
+      </main>
+    </>
   );
 }
 
@@ -571,10 +699,14 @@ export default function SettingsPage() {
 
   if (loading || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <p className="text-sm text-gray-500">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F9FC] px-4">
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 text-sm text-slate-500 shadow-sm">
+          <LoaderCircle
+            size={19}
+            className="animate-spin text-[#0756A5]"
+          />
           Memuat pengaturan...
-        </p>
+        </div>
       </main>
     );
   }

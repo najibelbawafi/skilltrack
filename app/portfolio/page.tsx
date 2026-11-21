@@ -19,6 +19,8 @@ import {
   LockKeyhole,
   Palette,
   Check,
+  Building2,
+  BriefcaseBusiness,
 } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
@@ -155,105 +157,105 @@ const themeStyles: Record<
 > = {
   formal: {
     page: "bg-[#F4F7FB]",
-    sheet: "rounded-2xl border border-gray-200 bg-white shadow-sm",
+    sheet: "border border-slate-200 bg-white shadow-sm",
     hero: "bg-[#0756A5]",
     heroText: "text-white",
     secondaryText: "text-blue-100",
     accent: "text-[#0756A5]",
     badge: "bg-blue-50 text-[#0756A5]",
     sectionTitle: "text-[#25364A]",
-    card: "rounded-xl border border-gray-200 bg-white",
+    card: "border border-slate-200 bg-white",
     soft: "bg-[#F4F7FB]",
-    divider: "border-gray-200",
+    divider: "border-slate-200",
   },
   modern: {
     page: "bg-[#ECFDF5]",
-    sheet: "rounded-3xl border border-emerald-100 bg-white shadow-md",
+    sheet: "border border-emerald-100 bg-white shadow-sm",
     hero: "bg-gradient-to-r from-[#0F766E] to-[#115E59]",
     heroText: "text-white",
     secondaryText: "text-emerald-100",
     accent: "text-[#0F766E]",
     badge: "bg-emerald-50 text-emerald-800",
     sectionTitle: "text-[#134E4A]",
-    card: "rounded-2xl border border-emerald-100 bg-white",
+    card: "border border-emerald-100 bg-white",
     soft: "bg-emerald-50",
     divider: "border-emerald-100",
   },
   minimal: {
     page: "bg-[#F8FAFC]",
-    sheet: "rounded-lg border border-slate-200 bg-white shadow-none",
+    sheet: "border border-slate-200 bg-white",
     hero: "bg-[#E2E8F0]",
     heroText: "text-slate-900",
     secondaryText: "text-slate-600",
     accent: "text-slate-700",
     badge: "bg-slate-100 text-slate-700",
     sectionTitle: "text-slate-900",
-    card: "rounded-lg border border-slate-200 bg-white",
+    card: "border border-slate-200 bg-white",
     soft: "bg-slate-50",
     divider: "border-slate-200",
   },
   executive: {
     page: "bg-[#E2E8F0]",
-    sheet: "rounded-xl border border-slate-300 bg-white shadow-lg",
+    sheet: "border border-slate-300 bg-white shadow-md",
     hero: "bg-[#1E293B]",
     heroText: "text-white",
     secondaryText: "text-slate-300",
     accent: "text-[#334155]",
     badge: "bg-slate-100 text-slate-800",
     sectionTitle: "text-[#1E293B]",
-    card: "rounded-lg border border-slate-200 bg-white",
+    card: "border border-slate-200 bg-white",
     soft: "bg-slate-100",
     divider: "border-slate-300",
   },
   creative: {
     page: "bg-[#F0FDFA]",
-    sheet: "rounded-3xl border border-teal-100 bg-white shadow-md",
+    sheet: "border border-teal-100 bg-white shadow-sm",
     hero: "bg-gradient-to-br from-[#0D9488] to-[#0369A1]",
     heroText: "text-white",
     secondaryText: "text-teal-100",
     accent: "text-[#0F766E]",
     badge: "bg-teal-50 text-teal-800",
     sectionTitle: "text-[#134E4A]",
-    card: "rounded-2xl border border-teal-100 bg-white",
+    card: "border border-teal-100 bg-white",
     soft: "bg-teal-50",
     divider: "border-teal-100",
   },
   technical: {
     page: "bg-[#EFF6FF]",
-    sheet: "rounded-xl border border-blue-200 bg-white shadow-sm",
+    sheet: "border border-blue-200 bg-white shadow-sm",
     hero: "bg-[#0C4A6E]",
     heroText: "text-white",
     secondaryText: "text-sky-200",
     accent: "text-[#0369A1]",
     badge: "bg-sky-50 text-sky-800",
     sectionTitle: "text-[#0C4A6E]",
-    card: "rounded-lg border border-blue-200 bg-white",
+    card: "border border-blue-200 bg-white",
     soft: "bg-sky-50",
     divider: "border-blue-200",
   },
   "two-column": {
     page: "bg-[#F1F5F9]",
-    sheet: "rounded-2xl border border-slate-200 bg-white shadow-sm",
+    sheet: "border border-slate-200 bg-white shadow-sm",
     hero: "bg-[#1D4ED8]",
     heroText: "text-white",
     secondaryText: "text-blue-100",
     accent: "text-[#1D4ED8]",
     badge: "bg-blue-50 text-blue-800",
     sectionTitle: "text-[#1E3A8A]",
-    card: "rounded-xl border border-slate-200 bg-white",
+    card: "border border-slate-200 bg-white",
     soft: "bg-blue-50",
     divider: "border-slate-200",
   },
   monochrome: {
     page: "bg-[#E5E5E5]",
-    sheet: "rounded-none border border-neutral-300 bg-white shadow-none",
+    sheet: "border border-neutral-300 bg-white",
     hero: "bg-[#18181B]",
     heroText: "text-white",
     secondaryText: "text-neutral-300",
     accent: "text-neutral-800",
     badge: "bg-neutral-100 text-neutral-800",
     sectionTitle: "text-neutral-900",
-    card: "rounded-none border border-neutral-300 bg-white",
+    card: "border border-neutral-300 bg-white",
     soft: "bg-neutral-100",
     divider: "border-neutral-300",
   },
@@ -296,9 +298,9 @@ function formatDate(value: string) {
 }
 
 const sectionAnimation = {
-  initial: { opacity: 0, y: 16 },
+  initial: { opacity: 0, y: 14 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.4, ease: "easeOut" as const },
+  transition: { duration: 0.35, ease: "easeOut" as const },
 };
 
 export default function PortfolioPage() {
@@ -342,11 +344,9 @@ export default function PortfolioPage() {
         `skilltrack_portfolio_theme_${userId}`
       );
 
-      if (isPortfolioTheme(savedTheme)) {
-        setSelectedTheme(savedTheme);
-      } else {
-        setSelectedTheme("formal");
-      }
+      setSelectedTheme(
+        isPortfolioTheme(savedTheme) ? savedTheme : "formal"
+      );
     } catch {
       setSelectedTheme("formal");
     }
@@ -579,10 +579,12 @@ export default function PortfolioPage() {
     !publicationLoaded
   ) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <div className="flex items-center gap-3 text-sm text-slate-500">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-[#0756A5]" />
-          Memuat portofolio...
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F9FC]">
+        <div className="text-center">
+          <span className="mx-auto block h-7 w-7 animate-spin rounded-full border-2 border-blue-100 border-t-[#0756A5]" />
+          <p className="mt-4 text-sm text-slate-500">
+            Memuat portofolio...
+          </p>
         </div>
       </main>
     );
@@ -590,21 +592,26 @@ export default function PortfolioPage() {
 
   if (dataError) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-4">
-        <div className="glass-card max-w-md p-6 text-center">
-          <p className="font-semibold text-red-700">
-            Gagal memuat portofolio
-          </p>
-          <p className="mt-2 text-sm text-gray-600">{dataError}</p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="glass-button mt-5 rounded-xl bg-[#0756A5] px-5 py-2.5 text-sm font-semibold text-white"
-          >
-            Muat Ulang
-          </button>
-        </div>
-      </main>
+      <>
+        <PageHeader />
+        <main className="flex min-h-screen items-center justify-center bg-[#F7F9FC] px-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm">
+            <p className="font-semibold text-red-700">
+              Gagal memuat portofolio
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              {dataError}
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-5 rounded-xl bg-[#0756A5] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+            >
+              Muat Ulang
+            </button>
+          </div>
+        </main>
+      </>
     );
   }
 
@@ -620,24 +627,41 @@ export default function PortfolioPage() {
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45 }}
-          className="mx-auto max-w-5xl"
+          transition={{ duration: 0.4 }}
+          className="mx-auto max-w-6xl"
         >
-          <div className="mb-6 flex justify-end">
-            <span className={`rounded-full px-4 py-2 text-xs font-semibold ${style.badge}`}>
-              PREVIEW PORTOFOLIO
-            </span>
+          {/* Page heading */}
+          <div className="mb-7">
+            <p className="flex items-center gap-2 text-sm font-semibold text-[#0756A5]">
+              <BriefcaseBusiness size={17} />
+              Portofolio Siswa
+            </p>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+              Kelola Portofolio
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              Atur tampilan, pilih tema, dan tentukan apakah portofolio
+              kamu dapat dilihat melalui Direktori Siswa.
+            </p>
           </div>
 
+          {/* Theme selector */}
           <motion.section
             {...sectionAnimation}
-            className="glass-card mb-6 p-5 md:p-6"
+            className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6"
           >
-            <div className="mb-5 flex items-center gap-2">
-              <Palette size={20} className="text-[#0756A5]" />
-              <h2 className="font-bold text-[#25364A]">
-                Pilih Tema Portofolio
-              </h2>
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
+                <Palette size={20} />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-900">
+                  Pilih Tema Portofolio
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Pilih tampilan yang sesuai dengan gaya portofolio.
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -650,17 +674,17 @@ export default function PortfolioPage() {
                     type="button"
                     onClick={() => handleThemeChange(theme.id)}
                     aria-pressed={active}
-                    whileHover={{ y: -3 }}
+                    whileHover={{ y: -2 }}
                     whileTap={{ scale: 0.98 }}
                     className={`rounded-xl border p-3 text-left transition-all duration-200 ${
                       active
-                        ? "border-[#0756A5] bg-blue-50/90 ring-2 ring-blue-100"
-                        : "border-white/80 bg-white/65 hover:border-blue-300 hover:bg-white"
+                        ? "border-[#0756A5] bg-blue-50 ring-2 ring-blue-100"
+                        : "border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50"
                     }`}
                   >
                     <div className="mb-3 flex items-center justify-between">
                       <span
-                        className="h-7 w-7 rounded-lg border border-black/10"
+                        className="h-8 w-8 rounded-lg border border-black/10"
                         style={{ backgroundColor: theme.color }}
                       />
                       {active && (
@@ -668,10 +692,10 @@ export default function PortfolioPage() {
                       )}
                     </div>
 
-                    <p className="text-sm font-semibold text-[#25364A]">
+                    <p className="text-sm font-semibold text-slate-800">
                       {theme.name}
                     </p>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       {theme.description}
                     </p>
                   </motion.button>
@@ -679,54 +703,60 @@ export default function PortfolioPage() {
               })}
             </div>
 
-            <p className="mt-4 text-xs text-gray-500">
+            <p className="mt-4 text-xs text-slate-400">
               Tema yang dipilih akan tersimpan otomatis pada akun ini.
             </p>
           </motion.section>
 
+          {/* Publication settings */}
           <motion.section
             {...sectionAnimation}
-            transition={{ ...sectionAnimation.transition, delay: 0.08 }}
-            className="glass-card mb-6 p-5 md:p-6"
+            transition={{ ...sectionAnimation.transition, delay: 0.05 }}
+            className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6"
           >
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-              <div>
-                <div className="flex items-center gap-2">
-                  {isPublic ? (
-                    <Globe size={21} className="text-green-600" />
-                  ) : (
-                    <LockKeyhole size={21} className="text-gray-500" />
-                  )}
-
-                  <h2 className="font-bold text-[#25364A]">
-                    Publikasi Portofolio
-                  </h2>
-                </div>
-
-                <p className="mt-2 text-sm leading-6 text-gray-600">
-                  {isPublic
-                    ? "Portofolio kamu berstatus Publik dan dapat ditemukan melalui Direktori Siswa."
-                    : "Portofolio kamu berstatus Privat dan tidak ditampilkan di Direktori Siswa."}
-                </p>
-
-                <span
-                  className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+              <div className="flex items-start gap-3">
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                     isPublic
-                      ? "bg-green-100 text-green-700"
-                      : "bg-gray-100 text-gray-600"
+                      ? "bg-green-50 text-green-700"
+                      : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {isPublic ? "PUBLIK" : "PRIVAT"}
-                </span>
+                  {isPublic ? (
+                    <Globe size={20} />
+                  ) : (
+                    <LockKeyhole size={20} />
+                  )}
+                </div>
+
+                <div>
+                  <h2 className="font-bold text-slate-900">
+                    Publikasi Portofolio
+                  </h2>
+                  <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
+                    {isPublic
+                      ? "Portofolio berstatus publik dan dapat ditemukan melalui Direktori Siswa."
+                      : "Portofolio berstatus privat dan tidak ditampilkan di Direktori Siswa."}
+                  </p>
+
+                  <span
+                    className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                      isPublic
+                        ? "bg-green-50 text-green-700"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {isPublic ? "Publik" : "Privat"}
+                  </span>
+                </div>
               </div>
 
-              <motion.button
+              <button
                 type="button"
                 onClick={handlePublicationToggle}
                 disabled={publicationSaving}
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                className={`glass-button rounded-xl px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`min-h-11 shrink-0 rounded-xl px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
                   isPublic
                     ? "bg-slate-600 hover:bg-slate-700"
                     : "bg-[#0756A5] hover:bg-blue-800"
@@ -737,30 +767,46 @@ export default function PortfolioPage() {
                   : isPublic
                     ? "Jadikan Privat"
                     : "Publikasikan Portofolio"}
-              </motion.button>
+              </button>
             </div>
 
             {publicationError && (
-              <p className="mt-3 text-sm text-red-600">
+              <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
                 {publicationError}
               </p>
             )}
 
-            <p className="mt-4 border-t border-gray-100/80 pt-4 text-xs leading-5 text-gray-500">
-              Status publikasi tersimpan di Supabase. Informasi kontak
-              pribadi hanya ditampilkan pada preview pemilik akun,
-              bukan pada halaman publik Direktori Siswa.
+            <p className="mt-5 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-500">
+              Pengaturan publikasi tersimpan di Supabase. Pastikan
+              informasi yang ditampilkan pada portofolio tidak memuat
+              data pribadi yang tidak ingin dibagikan.
             </p>
           </motion.section>
 
-          {/* Dokumen portofolio tetap menggunakan latar putih solid */}
+          {/* Portfolio preview */}
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Preview Portofolio
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Tampilan portofolio berdasarkan data akun kamu.
+              </p>
+            </div>
+
+            <span className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500">
+              {portfolioThemes.find((item) => item.id === selectedTheme)?.name}
+            </span>
+          </div>
+
           <motion.section
             {...sectionAnimation}
-            transition={{ ...sectionAnimation.transition, delay: 0.12 }}
-            className={`overflow-hidden ${style.sheet}`}
+            transition={{ ...sectionAnimation.transition, delay: 0.1 }}
+            className={`overflow-hidden rounded-2xl ${style.sheet}`}
           >
-            <div className={`px-6 py-10 md:px-10 ${style.hero}`}>
-              <p className={`text-sm font-medium tracking-wider ${style.secondaryText}`}>
+            {/* Profile hero */}
+            <div className={`px-6 py-10 md:px-10 md:py-12 ${style.hero}`}>
+              <p className={`text-xs font-semibold tracking-[0.18em] ${style.secondaryText}`}>
                 STUDENT DIGITAL PORTFOLIO
               </p>
 
@@ -779,11 +825,11 @@ export default function PortfolioPage() {
                   </div>
                 )}
 
-                <div>
-                  <h1 className={`text-3xl font-bold md:text-4xl ${style.heroText}`}>
+                <div className="min-w-0">
+                  <h1 className={`break-words text-3xl font-bold md:text-4xl ${style.heroText}`}>
                     {fullName}
                   </h1>
-                  <p className={`mt-2 ${style.secondaryText}`}>
+                  <p className={`mt-2 text-sm md:text-base ${style.secondaryText}`}>
                     {profile?.major || "Jurusan belum diisi"}
                   </p>
                   <p className={`mt-1 text-sm ${style.secondaryText}`}>
@@ -793,14 +839,16 @@ export default function PortfolioPage() {
               </div>
             </div>
 
-            <div className="grid gap-8 p-6 md:grid-cols-[1fr_2fr] md:p-10">
-              <aside className="space-y-7">
+            {/* Portfolio content */}
+            <div className="grid gap-8 p-6 md:grid-cols-[0.85fr_1.6fr] md:gap-10 md:p-10">
+              {/* Sidebar */}
+              <aside className="space-y-8">
                 <section>
                   <h2 className={`flex items-center gap-2 font-bold ${style.sectionTitle}`}>
                     <User size={19} className={style.accent} />
                     Tentang Saya
                   </h2>
-                  <p className="mt-3 whitespace-pre-line text-sm leading-7 text-gray-600">
+                  <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-600">
                     {profile?.bio || "Belum ada deskripsi diri."}
                   </p>
                 </section>
@@ -809,22 +857,23 @@ export default function PortfolioPage() {
                   <h2 className={`font-bold ${style.sectionTitle}`}>
                     Informasi Kontak
                   </h2>
-                  <div className="mt-4 space-y-3 text-sm text-gray-600">
+
+                  <div className="mt-4 space-y-3 text-sm text-slate-600">
                     <p className="flex items-start gap-2 break-all">
-                      <Mail size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
+                      <Mail size={16} className={`mt-0.5 shrink-0 ${style.accent}`} />
                       {profile?.email || user.email}
                     </p>
 
                     {profile?.phone && (
                       <p className="flex items-start gap-2">
-                        <Phone size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
+                        <Phone size={16} className={`mt-0.5 shrink-0 ${style.accent}`} />
                         {profile.phone}
                       </p>
                     )}
 
                     {profile?.address && (
                       <p className="flex items-start gap-2">
-                        <MapPin size={17} className={`mt-0.5 shrink-0 ${style.accent}`} />
+                        <MapPin size={16} className={`mt-0.5 shrink-0 ${style.accent}`} />
                         {profile.address}
                       </p>
                     )}
@@ -837,33 +886,37 @@ export default function PortfolioPage() {
                     Pendidikan
                   </h2>
 
-                  <div className={`mt-3 p-4 ${style.soft} ${style.card}`}>
+                  <div className={`mt-3 rounded-xl p-4 ${style.soft} ${style.card}`}>
                     <p className={`font-semibold ${style.sectionTitle}`}>
                       {profile?.school || "Sekolah belum diisi"}
                     </p>
-                    <p className="mt-1 text-sm text-gray-600">
+                    <p className="mt-1 text-sm text-slate-600">
                       {profile?.major || "Jurusan belum diisi"}
                     </p>
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="mt-3 text-xs text-slate-500">
                       {profile?.startYear || "-"} – {profile?.graduationYear || "-"}
                     </p>
                   </div>
                 </section>
               </aside>
 
-              <div className="space-y-8">
+              {/* Main sections */}
+              <div className="min-w-0 space-y-9">
+                {/* Projects */}
                 <section>
-                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
+                  <div className="flex items-center gap-2">
                     <FolderKanban size={20} className={style.accent} />
-                    Proyek Saya
-                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
+                    <h2 className={`text-lg font-bold ${style.sectionTitle}`}>
+                      Proyek Saya
+                    </h2>
+                    <span className={`ml-auto rounded-full px-3 py-1 text-xs font-semibold ${style.badge}`}>
                       {projects.length} proyek
                     </span>
-                  </h2>
+                  </div>
 
                   <div className="mt-4 space-y-3">
                     {projects.length === 0 ? (
-                      <p className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}>
+                      <p className={`rounded-xl p-4 text-sm text-slate-500 ${style.soft} ${style.card}`}>
                         Belum ada proyek yang ditambahkan.
                       </p>
                     ) : (
@@ -871,27 +924,34 @@ export default function PortfolioPage() {
                         const safeUrl = getSafeExternalUrl(project.link);
 
                         return (
-                          <article key={project.id} className={`p-4 ${style.card}`}>
+                          <article
+                            key={project.id}
+                            className={`rounded-xl p-4 transition-shadow hover:shadow-sm ${style.card}`}
+                          >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <h3 className={`font-semibold ${style.sectionTitle}`}>
                                 {project.title}
                               </h3>
-                              <span className={`rounded-full px-3 py-1 text-xs ${style.badge}`}>
-                                {project.category}
-                              </span>
+                              {project.category && (
+                                <span className={`rounded-full px-3 py-1 text-xs font-medium ${style.badge}`}>
+                                  {project.category}
+                                </span>
+                              )}
                             </div>
 
-                            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-600">
-                              {project.description}
-                            </p>
+                            {project.description && (
+                              <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
+                                {project.description}
+                              </p>
+                            )}
 
                             {project.technologies && (
-                              <p className="mt-3 text-xs text-gray-500">
+                              <p className="mt-3 text-xs text-slate-500">
                                 Teknologi: {project.technologies}
                               </p>
                             )}
 
-                            <p className="mt-2 text-xs text-gray-500">
+                            <p className="mt-2 text-xs text-slate-500">
                               Tahun: {project.year || "-"}
                             </p>
 
@@ -901,7 +961,7 @@ export default function PortfolioPage() {
                                   href={safeUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className={`mt-3 inline-flex items-center gap-2 text-sm font-medium hover:underline ${style.accent}`}
+                                  className={`mt-3 inline-flex items-center gap-2 text-sm font-semibold hover:underline ${style.accent}`}
                                 >
                                   Lihat proyek
                                   <ExternalLink size={14} />
@@ -918,18 +978,21 @@ export default function PortfolioPage() {
                   </div>
                 </section>
 
+                {/* Certificates */}
                 <section>
-                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
+                  <div className="flex items-center gap-2">
                     <Award size={20} className={style.accent} />
-                    Sertifikat
-                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
+                    <h2 className={`text-lg font-bold ${style.sectionTitle}`}>
+                      Sertifikat
+                    </h2>
+                    <span className={`ml-auto rounded-full px-3 py-1 text-xs font-semibold ${style.badge}`}>
                       {certificates.length} sertifikat
                     </span>
-                  </h2>
+                  </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {certificates.length === 0 ? (
-                      <p className={`p-4 text-sm text-gray-500 sm:col-span-2 ${style.soft} ${style.card}`}>
+                      <p className={`rounded-xl p-4 text-sm text-slate-500 sm:col-span-2 ${style.soft} ${style.card}`}>
                         Belum ada sertifikat yang ditambahkan.
                       </p>
                     ) : (
@@ -937,12 +1000,15 @@ export default function PortfolioPage() {
                         const safeUrl = getSafeExternalUrl(certificate.credentialUrl);
 
                         return (
-                          <article key={certificate.id} className={`overflow-hidden ${style.card}`}>
+                          <article
+                            key={certificate.id}
+                            className={`overflow-hidden rounded-xl ${style.card}`}
+                          >
                             {certificate.imageDataUrl && (
                               <img
                                 src={certificate.imageDataUrl}
                                 alt={`Sertifikat ${certificate.title}`}
-                                className="h-36 w-full object-cover"
+                                className="h-36 w-full bg-slate-50 object-contain"
                               />
                             )}
 
@@ -950,13 +1016,19 @@ export default function PortfolioPage() {
                               <h3 className={`font-semibold ${style.sectionTitle}`}>
                                 {certificate.title}
                               </h3>
-                              <p className="mt-1 text-sm text-gray-600">
+                              <p className="mt-1 text-sm text-slate-600">
                                 {certificate.issuer}
                               </p>
-                              <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                              <p className="mt-3 flex items-center gap-2 text-xs text-slate-500">
                                 <CalendarDays size={14} />
                                 {formatDate(certificate.issueDate)}
                               </p>
+
+                              {certificate.description && (
+                                <p className="mt-3 text-sm leading-6 text-slate-600">
+                                  {certificate.description}
+                                </p>
+                              )}
 
                               {certificate.credentialUrl &&
                                 (safeUrl ? (
@@ -964,7 +1036,7 @@ export default function PortfolioPage() {
                                     href={safeUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className={`mt-3 inline-flex items-center gap-2 text-sm font-medium hover:underline ${style.accent}`}
+                                    className={`mt-3 inline-flex items-center gap-2 text-sm font-semibold hover:underline ${style.accent}`}
                                   >
                                     Lihat bukti
                                     <ExternalLink size={14} />
@@ -982,55 +1054,58 @@ export default function PortfolioPage() {
                   </div>
                 </section>
 
+                {/* Achievements */}
                 <section>
-                  <h2 className={`flex items-center gap-2 text-lg font-bold ${style.sectionTitle}`}>
+                  <div className="flex items-center gap-2">
                     <Trophy size={20} className={style.accent} />
-                    Pencapaian
-                    <span className={`ml-auto rounded-full px-3 py-1 text-xs ${style.badge}`}>
+                    <h2 className={`text-lg font-bold ${style.sectionTitle}`}>
+                      Pencapaian
+                    </h2>
+                    <span className={`ml-auto rounded-full px-3 py-1 text-xs font-semibold ${style.badge}`}>
                       {achievements.length} pencapaian
                     </span>
-                  </h2>
+                  </div>
 
                   <div className="mt-4 space-y-3">
                     {achievements.length === 0 ? (
-                      <p className={`p-4 text-sm text-gray-500 ${style.soft} ${style.card}`}>
+                      <p className={`rounded-xl p-4 text-sm text-slate-500 ${style.soft} ${style.card}`}>
                         Belum ada pencapaian yang ditambahkan.
                       </p>
                     ) : (
                       achievements.map((achievement) => (
                         <article
                           key={achievement.id}
-                          className={`overflow-hidden sm:flex ${style.card}`}
+                          className={`overflow-hidden rounded-xl sm:flex ${style.card}`}
                         >
                           {achievement.imageDataUrl && (
                             <img
                               src={achievement.imageDataUrl}
                               alt={`Bukti ${achievement.title}`}
-                              className="h-40 w-full object-cover sm:h-auto sm:w-36"
+                              className="h-40 w-full bg-slate-50 object-contain sm:h-auto sm:w-36"
                             />
                           )}
 
-                          <div className="flex-1 p-4">
+                          <div className="min-w-0 flex-1 p-4">
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <h3 className={`font-semibold ${style.sectionTitle}`}>
                                 {achievement.title}
                               </h3>
-                              <span className="rounded-full bg-green-50 px-3 py-1 text-xs text-green-700">
+                              <span className={`rounded-full px-3 py-1 text-xs font-medium ${style.badge}`}>
                                 {achievement.category}
                               </span>
                             </div>
 
-                            <p className="mt-2 text-sm text-gray-600">
+                            <p className="mt-2 text-sm text-slate-600">
                               {achievement.organizer}
                             </p>
 
-                            <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                            <p className="mt-3 flex items-center gap-2 text-xs text-slate-500">
                               <CalendarDays size={14} />
                               {formatDate(achievement.date)}
                             </p>
 
                             {achievement.description && (
-                              <p className="mt-3 whitespace-pre-line text-sm leading-6 text-gray-600">
+                              <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">
                                 {achievement.description}
                               </p>
                             )}
@@ -1044,7 +1119,7 @@ export default function PortfolioPage() {
             </div>
           </motion.section>
 
-          <p className="mt-5 text-center text-xs text-gray-400">
+          <p className="mt-5 text-center text-xs text-slate-400">
             Portofolio ini menampilkan data yang tersimpan pada akun SkillTrack.
           </p>
         </motion.div>

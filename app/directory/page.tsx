@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -32,7 +32,7 @@ export default function DirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadPublicStudents() {
+  const loadPublicStudents = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -52,52 +52,19 @@ export default function DirectoryPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function fetchStudents() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const { data, error: fetchError } = await supabase.rpc(
-          "get_public_students"
-        );
-
-        if (fetchError) throw fetchError;
-
-        if (mounted) {
-          setPublicStudents((data ?? []) as PublicStudent[]);
-        }
-      } catch (err) {
-        console.error("Gagal mengambil direktori siswa:", err);
-
-        if (mounted) {
-          setError("Gagal memuat direktori siswa. Silakan coba kembali.");
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchStudents();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    void loadPublicStudents();
+  }, [loadPublicStudents]);
 
   const keyword = search.trim().toLowerCase();
 
   const filteredStudents = publicStudents.filter((student) => {
     return (
-      student.full_name.toLowerCase().includes(keyword) ||
-      student.major.toLowerCase().includes(keyword) ||
-      student.school.toLowerCase().includes(keyword)
+      (student.full_name ?? "").toLowerCase().includes(keyword) ||
+      (student.major ?? "").toLowerCase().includes(keyword) ||
+      (student.school ?? "").toLowerCase().includes(keyword)
     );
   });
 
@@ -106,6 +73,7 @@ export default function DirectoryPage() {
       <PageHeader />
 
       <section className="mx-auto max-w-7xl px-5 py-9 md:px-8 md:py-12">
+        {/* Hero Section */}
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -125,6 +93,7 @@ export default function DirectoryPage() {
           </p>
         </motion.div>
 
+        {/* Search and Statistics */}
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -140,6 +109,7 @@ export default function DirectoryPage() {
               <p className="text-sm text-gray-500">
                 Siswa terpublikasi
               </p>
+
               <p className="mt-1 text-3xl font-bold tabular-nums text-[#25364A]">
                 {loading ? "..." : publicStudents.length}
               </p>
@@ -174,11 +144,13 @@ export default function DirectoryPage() {
           </div>
         </motion.div>
 
+        {/* Student List Header */}
         <div className="mt-9 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-[#25364A]">
               Profil Siswa
             </h2>
+
             <p className="mt-1 text-sm text-gray-500">
               {loading
                 ? "Sedang mengambil data siswa..."
@@ -187,6 +159,7 @@ export default function DirectoryPage() {
           </div>
         </div>
 
+        {/* Student Content */}
         <AnimatePresence mode="wait">
           {loading ? (
             <motion.div
@@ -197,6 +170,7 @@ export default function DirectoryPage() {
               className="glass-card mt-5 flex flex-col items-center px-6 py-16 text-center"
             >
               <div className="h-9 w-9 animate-spin rounded-full border-2 border-blue-100 border-t-[#0756A5]" />
+
               <p className="mt-4 text-sm text-gray-500">
                 Memuat direktori siswa...
               </p>
@@ -256,7 +230,7 @@ export default function DirectoryPage() {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={student.photo_url}
-                            alt={student.full_name}
+                            alt={student.full_name || "Foto siswa"}
                             className="h-16 w-16 shrink-0 rounded-2xl border border-white object-cover shadow-sm"
                           />
                         ) : (
@@ -267,7 +241,7 @@ export default function DirectoryPage() {
 
                         <div className="min-w-0">
                           <h3 className="truncate text-lg font-bold text-[#25364A]">
-                            {student.full_name}
+                            {student.full_name || "Nama belum diisi"}
                           </h3>
 
                           <span className="mt-1.5 inline-flex items-center rounded-full border border-green-100 bg-green-50/80 px-3 py-1 text-xs font-semibold text-green-700">
@@ -276,13 +250,18 @@ export default function DirectoryPage() {
                         </div>
                       </div>
 
+                      {/* Student Information */}
                       <div className="mt-6 space-y-4 border-t border-white/80 pt-5">
                         <div className="flex items-start gap-3 text-sm text-gray-600">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
                             <GraduationCap size={18} />
                           </div>
+
                           <div className="min-w-0">
-                            <p className="text-xs text-gray-400">Jurusan</p>
+                            <p className="text-xs text-gray-400">
+                              Jurusan
+                            </p>
+
                             <p className="mt-0.5 break-words font-medium text-[#25364A]">
                               {student.major || "Jurusan belum diisi"}
                             </p>
@@ -293,8 +272,12 @@ export default function DirectoryPage() {
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
                             <Users size={18} />
                           </div>
+
                           <div className="min-w-0">
-                            <p className="text-xs text-gray-400">Sekolah</p>
+                            <p className="text-xs text-gray-400">
+                              Sekolah
+                            </p>
+
                             <p className="mt-0.5 break-words font-medium text-[#25364A]">
                               {student.school || "Sekolah belum diisi"}
                             </p>
@@ -302,6 +285,7 @@ export default function DirectoryPage() {
                         </div>
                       </div>
 
+                      {/* Navigation Buttons */}
                       <div className="mt-6 grid grid-cols-2 gap-3">
                         <Link
                           href={`/directory/${student.id}`}

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -24,6 +23,10 @@ import {
   FileText,
   Check,
   Globe,
+  Settings2,
+  Eye,
+  LockKeyhole,
+  ExternalLink,
 } from "lucide-react";
 
 import { useAuth } from "@/app/providers";
@@ -248,13 +251,16 @@ const CV_THEMES: ThemeConfig[] = [
 ];
 
 const panelClass =
-  "glass-card rounded-2xl p-5";
+  "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-3 text-sm text-[#25364A] outline-none transition placeholder:text-gray-400 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70";
+  "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#0756A5] focus:ring-4 focus:ring-blue-50";
 
 const primaryButtonClass =
-  "flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#064783] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#064783] disabled:cursor-not-allowed disabled:opacity-60";
+
+const secondaryButtonClass =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 function formatDate(value: string) {
   if (!value) return "-";
@@ -271,6 +277,17 @@ function formatDate(value: string) {
 
 function isCVTheme(value: string | null): value is CVTheme {
   return CV_THEMES.some((theme) => theme.id === value);
+}
+
+function getSafeExternalUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function mapProfile(
@@ -359,7 +376,7 @@ function SectionHeading({
 }) {
   return (
     <h2
-      className="mb-3 flex items-center gap-2 border-b pb-2 text-base font-bold"
+      className="mb-3 flex items-center gap-2 border-b pb-2 text-sm font-bold tracking-wide"
       style={{
         color: theme.text,
         borderColor: theme.border,
@@ -414,16 +431,12 @@ export default function CVPage() {
       let savedTheme: string | null = null;
 
       try {
-        savedTheme = localStorage.getItem(
-          `skilltrack_cv_theme_${userId}`
-        );
+        savedTheme = localStorage.getItem(`skilltrack_cv_theme_${userId}`);
       } catch {
         savedTheme = null;
       }
 
-      setSelectedTheme(
-        isCVTheme(savedTheme) ? savedTheme : "formal"
-      );
+      setSelectedTheme(isCVTheme(savedTheme) ? savedTheme : "formal");
 
       const [
         profileResult,
@@ -501,7 +514,9 @@ export default function CVPage() {
         console.error("Gagal memuat sertifikat:", certificatesResult.error);
         loadErrors.push("sertifikat");
         setCertificates(
-          []
+          ((certificatesResult.data ?? []) as CertificateRow[]).map(
+            mapCertificate
+          )
         );
       } else {
         setCertificates(
@@ -528,9 +543,7 @@ export default function CVPage() {
         loadErrors.push("keterampilan");
         setSkills([]);
       } else {
-        setSkills(
-          ((skillsResult.data ?? []) as SkillRow[]).map(mapSkill)
-        );
+        setSkills(((skillsResult.data ?? []) as SkillRow[]).map(mapSkill));
       }
 
       if (publicationResult.error) {
@@ -573,8 +586,7 @@ export default function CVPage() {
   }, [userId, user]);
 
   const theme =
-    CV_THEMES.find((item) => item.id === selectedTheme) ??
-    CV_THEMES[0];
+    CV_THEMES.find((item) => item.id === selectedTheme) ?? CV_THEMES[0];
 
   function changeTheme(themeId: CVTheme) {
     if (!userId) return;
@@ -582,10 +594,7 @@ export default function CVPage() {
     setSelectedTheme(themeId);
 
     try {
-      localStorage.setItem(
-        `skilltrack_cv_theme_${userId}`,
-        themeId
-      );
+      localStorage.setItem(`skilltrack_cv_theme_${userId}`, themeId);
     } catch (err) {
       console.error("Gagal menyimpan tema CV:", err);
     }
@@ -608,20 +617,14 @@ export default function CVPage() {
             is_public: nextStatus,
             updated_at: new Date().toISOString(),
           },
-          {
-            onConflict: "user_id",
-          }
+          { onConflict: "user_id" }
         );
 
       if (publicationError) throw publicationError;
 
       setCvIsPublic(nextStatus);
     } catch (err) {
-      console.error(
-        "Gagal menyimpan pengaturan publikasi CV:",
-        err
-      );
-
+      console.error("Gagal menyimpan pengaturan publikasi CV:", err);
       setError(
         "Gagal menyimpan pengaturan publikasi CV. Silakan coba kembali."
       );
@@ -655,19 +658,13 @@ export default function CVPage() {
     try {
       const { data, error: insertError } = await supabase
         .from("skills")
-        .insert({
-          user_id: userId,
-          name,
-        })
+        .insert({ user_id: userId, name })
         .select("*")
         .single();
 
       if (insertError) throw insertError;
 
-      setSkills((previous) => [
-        ...previous,
-        mapSkill(data as SkillRow),
-      ]);
+      setSkills((previous) => [...previous, mapSkill(data as SkillRow)]);
       setNewSkill("");
     } catch (err) {
       console.error("Gagal menambahkan keterampilan:", err);
@@ -692,9 +689,7 @@ export default function CVPage() {
 
       if (deleteError) throw deleteError;
 
-      setSkills((previous) =>
-        previous.filter((skill) => skill.id !== id)
-      );
+      setSkills((previous) => previous.filter((skill) => skill.id !== id));
     } catch (err) {
       console.error("Gagal menghapus keterampilan:", err);
       setError("Gagal menghapus keterampilan. Silakan coba kembali.");
@@ -729,18 +724,11 @@ export default function CVPage() {
 
   if (authLoading || !user || !loaded) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card flex items-center gap-3 rounded-2xl px-5 py-4"
-        >
-          <LoaderCircle
-            size={19}
-            className="animate-spin text-[#0756A5]"
-          />
-          <p className="text-sm text-gray-600">Memuat CV...</p>
-        </motion.div>
+      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <LoaderCircle size={19} className="animate-spin text-[#0756A5]" />
+          <p className="text-sm text-slate-600">Memuat CV...</p>
+        </div>
       </main>
     );
   }
@@ -751,7 +739,7 @@ export default function CVPage() {
 
   const profileSection = (
     <section>
-      <SectionHeading icon={<User size={18} />} theme={theme}>
+      <SectionHeading icon={<User size={17} />} theme={theme}>
         PROFIL SINGKAT
       </SectionHeading>
       <p
@@ -765,10 +753,7 @@ export default function CVPage() {
 
   const educationSection = (
     <section>
-      <SectionHeading
-        icon={<GraduationCap size={18} />}
-        theme={theme}
-      >
+      <SectionHeading icon={<GraduationCap size={17} />} theme={theme}>
         PENDIDIKAN
       </SectionHeading>
       <div>
@@ -787,12 +772,10 @@ export default function CVPage() {
 
   const skillsSection = (
     <section>
-      <SectionHeading
-        icon={<BriefcaseBusiness size={18} />}
-        theme={theme}
-      >
+      <SectionHeading icon={<BriefcaseBusiness size={17} />} theme={theme}>
         KETERAMPILAN
       </SectionHeading>
+
       {skills.length === 0 ? (
         <p className="text-sm" style={{ color: theme.muted }}>
           Belum ada keterampilan yang ditambahkan.
@@ -818,50 +801,68 @@ export default function CVPage() {
 
   const projectsSection = (
     <section>
-      <SectionHeading
-        icon={<FolderKanban size={18} />}
-        theme={theme}
-      >
+      <SectionHeading icon={<FolderKanban size={17} />} theme={theme}>
         PROYEK
       </SectionHeading>
+
       <div className="space-y-4">
         {projects.length === 0 ? (
           <p className="text-sm" style={{ color: theme.muted }}>
             Belum ada proyek.
           </p>
         ) : (
-          projects.map((project) => (
-            <article key={project.id}>
-              <div className="flex flex-wrap justify-between gap-2">
-                <h3 className="font-semibold" style={{ color: theme.text }}>
-                  {project.title}
-                </h3>
-                <span className="text-xs" style={{ color: theme.muted }}>
-                  {project.year || "-"}
-                </span>
-              </div>
+          projects.map((project) => {
+            const safeLink = getSafeExternalUrl(project.link);
 
-              <p
-                className="mt-1 text-xs font-medium"
-                style={{ color: theme.accent }}
-              >
-                {project.category}
-              </p>
+            return (
+              <article key={project.id}>
+                <div className="flex flex-wrap justify-between gap-2">
+                  <h3 className="font-semibold" style={{ color: theme.text }}>
+                    {project.title}
+                  </h3>
+                  <span className="text-xs" style={{ color: theme.muted }}>
+                    {project.year || "-"}
+                  </span>
+                </div>
 
-              <p
-                className="mt-2 whitespace-pre-line text-sm leading-6"
-                style={{ color: theme.muted }}
-              >
-                {project.description}
-              </p>
+                {project.category && (
+                  <p
+                    className="mt-1 text-xs font-medium"
+                    style={{ color: theme.accent }}
+                  >
+                    {project.category}
+                  </p>
+                )}
 
-              {project.technologies && (
-                <p className="mt-2 text-xs" style={{ color: theme.muted }}>
-                  Teknologi: {project.technologies}
-                </p>
-              )}
-            </article>
-          ))
+                {project.description && (
+                  <p
+                    className="mt-2 whitespace-pre-line text-sm leading-6"
+                    style={{ color: theme.muted }}
+                  >
+                    {project.description}
+                  </p>
+                )}
+
+                {project.technologies && (
+                  <p className="mt-2 text-xs" style={{ color: theme.muted }}>
+                    Teknologi: {project.technologies}
+                  </p>
+                )}
+
+                {safeLink && (
+                  <a
+                    href={safeLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium"
+                    style={{ color: theme.accent }}
+                  >
+                    Lihat proyek <ExternalLink size={12} />
+                  </a>
+                )}
+              </article>
+            );
+          })
         )}
       </div>
     </section>
@@ -869,28 +870,52 @@ export default function CVPage() {
 
   const certificatesSection = (
     <section>
-      <SectionHeading icon={<Award size={18} />} theme={theme}>
+      <SectionHeading icon={<Award size={17} />} theme={theme}>
         SERTIFIKAT
       </SectionHeading>
-      <div className="space-y-3">
+
+      <div className="space-y-4">
         {certificates.length === 0 ? (
           <p className="text-sm" style={{ color: theme.muted }}>
             Belum ada sertifikat.
           </p>
         ) : (
-          certificates.map((certificate) => (
-            <article key={certificate.id}>
-              <h3 className="font-semibold" style={{ color: theme.text }}>
-                {certificate.title}
-              </h3>
-              <p className="mt-1 text-sm" style={{ color: theme.muted }}>
-                {certificate.issuer}
-              </p>
-              <p className="mt-1 text-xs" style={{ color: theme.muted }}>
-                {formatDate(certificate.issueDate)}
-              </p>
-            </article>
-          ))
+          certificates.map((certificate) => {
+            const safeLink = getSafeExternalUrl(certificate.credentialUrl);
+
+            return (
+              <article key={certificate.id}>
+                <h3 className="font-semibold" style={{ color: theme.text }}>
+                  {certificate.title}
+                </h3>
+                <p className="mt-1 text-sm" style={{ color: theme.muted }}>
+                  {certificate.issuer}
+                </p>
+                <p className="mt-1 text-xs" style={{ color: theme.muted }}>
+                  {formatDate(certificate.issueDate)}
+                </p>
+                {certificate.description && (
+                  <p
+                    className="mt-2 whitespace-pre-line text-sm leading-6"
+                    style={{ color: theme.muted }}
+                  >
+                    {certificate.description}
+                  </p>
+                )}
+                {safeLink && (
+                  <a
+                    href={safeLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium"
+                    style={{ color: theme.accent }}
+                  >
+                    Lihat kredensial <ExternalLink size={12} />
+                  </a>
+                )}
+              </article>
+            );
+          })
         )}
       </div>
     </section>
@@ -898,10 +923,11 @@ export default function CVPage() {
 
   const achievementsSection = (
     <section>
-      <SectionHeading icon={<Trophy size={18} />} theme={theme}>
+      <SectionHeading icon={<Trophy size={17} />} theme={theme}>
         PENCAPAIAN
       </SectionHeading>
-      <div className="space-y-3">
+
+      <div className="space-y-4">
         {achievements.length === 0 ? (
           <p className="text-sm" style={{ color: theme.muted }}>
             Belum ada pencapaian.
@@ -912,12 +938,16 @@ export default function CVPage() {
               <h3 className="font-semibold" style={{ color: theme.text }}>
                 {achievement.title}
               </h3>
-              <p className="mt-1 text-xs" style={{ color: theme.accent }}>
-                {achievement.category}
-              </p>
-              <p className="mt-1 text-sm" style={{ color: theme.muted }}>
-                {achievement.organizer}
-              </p>
+              {achievement.category && (
+                <p className="mt-1 text-xs" style={{ color: theme.accent }}>
+                  {achievement.category}
+                </p>
+              )}
+              {achievement.organizer && (
+                <p className="mt-1 text-sm" style={{ color: theme.muted }}>
+                  {achievement.organizer}
+                </p>
+              )}
               <p className="mt-1 text-xs" style={{ color: theme.muted }}>
                 {formatDate(achievement.date)}
               </p>
@@ -937,76 +967,86 @@ export default function CVPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#F4F7FB]">
-      <motion.header
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="glass-strong sticky top-0 z-30 border-b border-white/70"
-      >
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-6">
-          <Link
-            href="/dashboard"
-            className="glass-button flex h-10 w-10 items-center justify-center rounded-xl text-gray-600"
-            aria-label="Kembali ke dashboard"
-          >
-            <ArrowLeft size={19} />
-          </Link>
+    <main className="min-h-screen bg-slate-50">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link
+              href="/dashboard"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50 hover:text-[#0756A5]"
+              aria-label="Kembali ke dashboard"
+            >
+              <ArrowLeft size={19} />
+            </Link>
 
-          <div>
-            <h1 className="font-bold text-[#25364A]">CV Saya</h1>
-            <p className="text-xs text-gray-500">
-              Curriculum Vitae Digital
-            </p>
+            <div className="min-w-0">
+              <h1 className="font-bold text-slate-900">CV Saya</h1>
+              <p className="text-xs text-slate-500">
+                Kelola dan buat CV profesional
+              </p>
+            </div>
           </div>
-        </div>
-      </motion.header>
 
-      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[300px_1fr]">
-        <motion.aside
-          initial={{ opacity: 0, x: -14 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, delay: 0.05 }}
-          className="h-fit space-y-5"
-        >
+          <Link
+            href="/profile"
+            className="hidden items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 sm:inline-flex"
+          >
+            <User size={16} />
+            Edit Profil
+          </Link>
+        </div>
+      </header>
+
+      <div className="mx-auto grid max-w-[1440px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:px-8">
+        <aside className="h-fit space-y-5">
           <section className={panelClass}>
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-bold text-[#25364A]">
-                  Publikasi CV
-                </h2>
-                <p className="mt-1 text-xs leading-5 text-gray-500">
-                  Atur apakah CV dapat dilihat melalui Direktori Siswa.
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
+                  <Globe size={18} />
+                </div>
+                <h2 className="font-bold text-slate-900">Publikasi CV</h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Atur visibilitas CV melalui Direktori Siswa.
                 </p>
               </div>
 
               <span
                 className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
                   cvIsPublic
-                    ? "bg-green-50 text-green-700"
-                    : "bg-gray-100 text-gray-600"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-slate-100 text-slate-600"
                 }`}
               >
                 {cvIsPublic ? "Publik" : "Privat"}
               </span>
             </div>
 
-            <div className="mt-4 rounded-xl border border-white/80 bg-white/60 p-3">
-              <p className="text-sm leading-6 text-gray-600">
-                {cvIsPublic
-                  ? "CV kamu dapat dibuka melalui Direktori Siswa."
-                  : "CV kamu belum dapat dilihat oleh pengunjung Direktori Siswa."}
-              </p>
+            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <div className="flex items-start gap-2.5">
+                {cvIsPublic ? (
+                  <Eye size={17} className="mt-0.5 shrink-0 text-emerald-600" />
+                ) : (
+                  <LockKeyhole
+                    size={17}
+                    className="mt-0.5 shrink-0 text-slate-500"
+                  />
+                )}
+                <p className="text-xs leading-5 text-slate-600">
+                  {cvIsPublic
+                    ? "CV kamu dapat dibuka melalui Direktori Siswa."
+                    : "CV kamu belum dapat dilihat oleh pengunjung Direktori Siswa."}
+                </p>
+              </div>
             </div>
 
-            <motion.button
-              whileTap={{ scale: 0.98 }}
+            <button
               type="button"
               onClick={toggleCVPublication}
               disabled={savingPublication}
               className={`mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 cvIsPublic
-                  ? "border border-red-200 bg-white/80 text-red-600 hover:bg-red-50"
+                  ? "border border-red-200 bg-white text-red-600 hover:bg-red-50"
                   : primaryButtonClass
               }`}
             >
@@ -1020,33 +1060,34 @@ export default function CVPage() {
                 : cvIsPublic
                   ? "Jadikan Privat"
                   : "Publikasikan CV"}
-            </motion.button>
+            </button>
           </section>
 
           <section className={panelClass}>
-            <h2 className="font-bold text-[#25364A]">
-              Pilih Tema CV
-            </h2>
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
+                <Settings2 size={18} />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-900">Tema CV</h2>
+                <p className="text-xs text-slate-500">Pilih tampilan dokumen</p>
+              </div>
+            </div>
 
-            <p className="mt-2 text-xs leading-5 text-gray-500">
-              Pilih desain CV. Tampilan preview akan berubah secara langsung.
-            </p>
-
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {CV_THEMES.map((item) => {
                 const active = selectedTheme === item.id;
 
                 return (
-                  <motion.button
+                  <button
                     key={item.id}
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.97 }}
                     type="button"
                     onClick={() => changeTheme(item.id)}
-                    className={`rounded-xl border p-2 text-left transition ${
+                    aria-pressed={active}
+                    className={`rounded-xl border p-2.5 text-left transition ${
                       active
-                        ? "border-[#0756A5] bg-blue-50/80 ring-1 ring-[#0756A5]"
-                        : "border-white/80 bg-white/50 hover:border-gray-300 hover:bg-white/80"
+                        ? "border-[#0756A5] bg-blue-50 ring-1 ring-[#0756A5]"
+                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                     }`}
                   >
                     <div
@@ -1054,20 +1095,20 @@ export default function CVPage() {
                       style={{ backgroundColor: item.soft }}
                     >
                       <div
-                        className="h-7 w-10 rounded-sm border-t-4 bg-white shadow-sm"
+                        className="h-7 w-10 rounded-sm border-t-4 bg-white p-1 shadow-sm"
                         style={{ borderColor: item.accent }}
                       >
                         <div
-                          className="mx-1 mt-1 h-1 w-5 rounded"
+                          className="h-1 w-5 rounded"
                           style={{ backgroundColor: item.accent }}
                         />
-                        <div className="mx-1 mt-1 h-1 w-7 rounded bg-gray-200" />
-                        <div className="mx-1 mt-1 h-1 w-6 rounded bg-gray-200" />
+                        <div className="mt-1 h-1 w-7 rounded bg-slate-200" />
+                        <div className="mt-1 h-1 w-6 rounded bg-slate-200" />
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-semibold text-[#25364A]">
+                      <span className="text-xs font-semibold text-slate-800">
                         {item.name}
                       </span>
                       {active && (
@@ -1078,28 +1119,27 @@ export default function CVPage() {
                       )}
                     </div>
 
-                    <p className="mt-1 text-[10px] leading-4 text-gray-500">
+                    <p className="mt-1 text-[10px] leading-4 text-slate-500">
                       {item.description}
                     </p>
-                  </motion.button>
+                  </button>
                 );
               })}
             </div>
 
-            <p className="mt-3 rounded-xl border border-green-100 bg-green-50/80 p-3 text-[11px] leading-5 text-green-700">
-              Tema tersimpan otomatis dan akan digunakan saat mengunduh PDF.
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              Tema tersimpan otomatis dan digunakan saat mengunduh PDF.
             </p>
           </section>
 
-          <section className={`${panelClass} space-y-4`}>
-            <div>
-              <h2 className="font-bold text-[#25364A]">
-                Keterampilan
-              </h2>
-
-              <p className="mt-2 text-xs leading-5 text-gray-500">
-                Tambahkan kemampuan teknis dan nonteknis yang ingin ditampilkan
-                pada CV.
+          <section className={panelClass}>
+            <div className="mb-4">
+              <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
+                <BriefcaseBusiness size={18} />
+              </div>
+              <h2 className="font-bold text-slate-900">Keterampilan</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Tambahkan kemampuan teknis dan nonteknis ke dalam CV.
               </p>
             </div>
 
@@ -1119,10 +1159,9 @@ export default function CVPage() {
                 className={inputClass}
               />
 
-              <motion.button
-                whileTap={{ scale: 0.98 }}
+              <button
                 type="submit"
-                disabled={savingSkill || skillsLoading}
+                disabled={savingSkill || skillsLoading || !newSkill.trim()}
                 className={`${primaryButtonClass} w-full`}
               >
                 {savingSkill ? (
@@ -1131,7 +1170,7 @@ export default function CVPage() {
                   <Plus size={17} />
                 )}
                 {savingSkill ? "Menyimpan..." : "Tambah Keterampilan"}
-              </motion.button>
+              </button>
             </form>
 
             <AnimatePresence>
@@ -1141,20 +1180,21 @@ export default function CVPage() {
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                   role="alert"
-                  className="rounded-xl border border-red-100 bg-red-50/90 p-3 text-xs leading-5 text-red-700"
+                  className="mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-xs leading-5 text-red-700"
                 >
                   {error}
                 </motion.p>
               )}
             </AnimatePresence>
 
-            <div className="space-y-2">
+            <div className="mt-4 space-y-2">
               {skillsLoading ? (
-                <p className="rounded-xl bg-white/60 p-3 text-xs text-gray-500">
+                <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+                  <LoaderCircle size={14} className="animate-spin" />
                   Memuat keterampilan...
-                </p>
+                </div>
               ) : skills.length === 0 ? (
-                <p className="rounded-xl bg-white/60 p-3 text-xs leading-5 text-gray-500">
+                <p className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-500">
                   Belum ada keterampilan. Tambahkan keterampilan untuk
                   melengkapi CV.
                 </p>
@@ -1167,9 +1207,9 @@ export default function CVPage() {
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, x: -10 }}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-white/80 bg-white/60 px-3 py-2"
+                      className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2"
                     >
-                      <span className="break-all text-sm text-[#25364A]">
+                      <span className="break-all text-sm text-slate-700">
                         {skill.name}
                       </span>
 
@@ -1177,7 +1217,7 @@ export default function CVPage() {
                         type="button"
                         disabled={deletingSkillId === skill.id}
                         onClick={() => removeSkill(skill.id)}
-                        className="shrink-0 rounded-lg p-2 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                        className="shrink-0 rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                         aria-label={`Hapus ${skill.name}`}
                       >
                         {deletingSkillId === skill.id ? (
@@ -1195,163 +1235,168 @@ export default function CVPage() {
               )}
             </div>
 
-            <div className="border-t border-white/80 pt-4">
-              <p className="text-xs leading-5 text-gray-500">
-                Data profil, proyek, sertifikat, pencapaian, keterampilan,
-                dan pengaturan publikasi CV diambil dari Supabase.
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="text-xs leading-5 text-slate-500">
+                Data profil, proyek, sertifikat, pencapaian, dan keterampilan
+                diambil dari akun SkillTrack kamu.
+              </p>
+              <Link
+                href="/profile"
+                className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#0756A5] hover:text-blue-800"
+              >
+                Edit Profil Saya
+                <ExternalLink size={14} />
+              </Link>
+            </div>
+          </section>
+        </aside>
+
+        <section className="min-w-0">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <FileText size={19} className="text-[#0756A5]" />
+                <h2 className="font-bold text-slate-900">Preview CV</h2>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Pratinjau dokumen sebelum diunduh.
               </p>
             </div>
 
-            <Link
-              href="/profile"
-              className="block text-center text-sm font-semibold text-[#0756A5] transition hover:text-blue-800 hover:underline"
-            >
-              Edit Profil Saya
-            </Link>
-          </section>
-        </motion.aside>
-
-        <motion.section
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="min-w-0"
-        >
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-bold text-[#25364A]">
-              <FileText size={19} className="text-[#0756A5]" />
-              Preview CV
-            </h2>
-
-            <span className="rounded-full border border-white/80 bg-white/60 px-3 py-1.5 text-xs text-gray-500">
-              Tema: {theme.name} | Format A4
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">
+              {theme.name} · A4
             </span>
           </div>
 
-          {/* Dokumen CV sengaja tetap putih solid untuk menjaga hasil PDF. */}
-          <div
-            ref={cvRef}
-            className="mx-auto min-h-[900px] w-full max-w-[794px] overflow-hidden bg-white p-6 shadow-[0_12px_45px_rgba(31,65,110,0.10)] sm:p-10"
-            style={{
-              color: theme.text,
-              backgroundColor: theme.header,
-              fontFamily:
-                selectedTheme === "executive"
-                  ? "Georgia, serif"
-                  : "Arial, sans-serif",
-            }}
-          >
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-200/60 p-2 sm:p-5">
             <div
-              className={`pb-6 ${
-                selectedTheme === "creative"
-                  ? "border-l-8 pl-5"
-                  : "border-b-4"
-              }`}
-              style={{ borderColor: theme.border }}
+              ref={cvRef}
+              className="mx-auto min-h-[1123px] w-full min-w-[320px] max-w-[794px] overflow-hidden bg-white p-6 shadow-lg sm:p-10"
+              style={{
+                color: theme.text,
+                backgroundColor: theme.header,
+                fontFamily:
+                  selectedTheme === "executive"
+                    ? "Georgia, serif"
+                    : "Arial, sans-serif",
+              }}
             >
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                {profile?.photoUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={profile.photoUrl}
-                    alt={`Foto ${fullName}`}
-                    className={`h-24 w-24 object-cover ${
-                      selectedTheme === "monochrome"
-                        ? "rounded-none"
-                        : "rounded-full"
-                    }`}
-                    style={{ border: `2px solid ${theme.soft}` }}
-                  />
-                )}
+              <div
+                className={`pb-6 ${
+                  selectedTheme === "creative"
+                    ? "border-l-8 pl-5"
+                    : "border-b-4"
+                }`}
+                style={{ borderColor: theme.border }}
+              >
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                  {profile?.photoUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profile.photoUrl}
+                      alt={`Foto ${fullName}`}
+                      className={`h-24 w-24 shrink-0 object-cover ${
+                        selectedTheme === "monochrome"
+                          ? "rounded-none"
+                          : "rounded-full"
+                      }`}
+                      style={{ border: `2px solid ${theme.soft}` }}
+                    />
+                  )}
 
-                <div className="min-w-0">
-                  <p
-                    className="text-xs font-bold tracking-[3px]"
-                    style={{ color: theme.accent }}
-                  >
-                    CURRICULUM VITAE
-                  </p>
+                  <div className="min-w-0">
+                    <p
+                      className="text-xs font-bold tracking-[3px]"
+                      style={{ color: theme.accent }}
+                    >
+                      CURRICULUM VITAE
+                    </p>
 
-                  <h1
-                    className={`mt-2 break-words text-3xl font-bold ${
-                      selectedTheme === "minimal" ? "font-normal" : ""
-                    }`}
-                  >
-                    {fullName}
-                  </h1>
+                    <h1
+                      className={`mt-2 break-words text-3xl font-bold ${
+                        selectedTheme === "minimal" ? "font-normal" : ""
+                      }`}
+                    >
+                      {fullName}
+                    </h1>
 
-                  <p className="mt-2 text-sm" style={{ color: theme.muted }}>
-                    {profile?.major || "Jurusan belum diisi"}
-                    {profile?.school ? ` | ${profile.school}` : ""}
-                  </p>
+                    <p className="mt-2 text-sm" style={{ color: theme.muted }}>
+                      {profile?.major || "Jurusan belum diisi"}
+                      {profile?.school ? ` | ${profile.school}` : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs"
+                  style={{ color: theme.muted }}
+                >
+                  {email && (
+                    <span className="flex items-center gap-1.5 break-all">
+                      <Mail size={14} />
+                      {email}
+                    </span>
+                  )}
+
+                  {profile?.phone && (
+                    <span className="flex items-center gap-1.5">
+                      <Phone size={14} />
+                      {profile.phone}
+                    </span>
+                  )}
+
+                  {profile?.address && (
+                    <span className="flex items-center gap-1.5">
+                      <MapPin size={14} />
+                      {profile.address}
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div
-                className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs"
-                style={{ color: theme.muted }}
-              >
-                <span className="flex items-center gap-1.5 break-all">
-                  <Mail size={14} />
-                  {email}
-                </span>
+              {twoColumn ? (
+                <div className="grid grid-cols-1 gap-7 pt-7 sm:grid-cols-[0.85fr_1.15fr]">
+                  <div className="space-y-7">
+                    {profileSection}
+                    {educationSection}
+                    {skillsSection}
+                  </div>
 
-                {profile?.phone && (
-                  <span className="flex items-center gap-1.5">
-                    <Phone size={14} />
-                    {profile.phone}
-                  </span>
-                )}
-
-                {profile?.address && (
-                  <span className="flex items-center gap-1.5">
-                    <MapPin size={14} />
-                    {profile.address}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {twoColumn ? (
-              <div className="grid grid-cols-1 gap-7 pt-7 sm:grid-cols-[0.85fr_1.15fr]">
-                <div className="space-y-7">
+                  <div className="space-y-7">
+                    {projectsSection}
+                    {certificatesSection}
+                    {achievementsSection}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-7 pt-7">
                   {profileSection}
                   {educationSection}
                   {skillsSection}
-                </div>
-
-                <div className="space-y-7">
                   {projectsSection}
                   {certificatesSection}
                   {achievementsSection}
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-7 pt-7">
-                {profileSection}
-                {educationSection}
-                {skillsSection}
-                {projectsSection}
-                {certificatesSection}
-                {achievementsSection}
-              </div>
-            )}
+              )}
 
-            <div
-              className="mt-10 border-t pt-4 text-center text-[10px]"
-              style={{
-                borderColor: theme.border,
-                color: theme.muted,
-              }}
-            >
-              Dibuat menggunakan SkillTrack Student Portfolio Platform
+              <div
+                className="mt-10 border-t pt-4 text-center text-[10px]"
+                style={{
+                  borderColor: theme.border,
+                  color: theme.muted,
+                }}
+              >
+                Dibuat menggunakan SkillTrack Student Portfolio Platform
+              </div>
             </div>
           </div>
 
-          <div className="mt-5 flex justify-end">
-            <motion.button
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs leading-5 text-slate-500">
+              Pastikan informasi CV sudah benar sebelum mengunduh.
+            </p>
+
+            <button
               type="button"
               onClick={handleDownload}
               disabled={generatingPdf}
@@ -1362,17 +1407,10 @@ export default function CVPage() {
               ) : (
                 <Download size={17} />
               )}
-
               {generatingPdf ? "Membuat PDF..." : "Unduh CV PDF"}
-            </motion.button>
+            </button>
           </div>
-
-          {error && (
-            <p className="mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">
-              {error}
-            </p>
-          )}
-        </motion.section>
+        </section>
       </div>
     </main>
   );

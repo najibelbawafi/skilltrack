@@ -39,7 +39,7 @@ type CertificateRow = {
 };
 
 const transition = {
-  duration: 0.45,
+  duration: 0.35,
   ease: [0.22, 1, 0.36, 1] as const,
 };
 
@@ -71,6 +71,20 @@ function getSafeExternalUrl(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+function formatIssueDate(value: string): string {
+  if (!value) return "-";
+
+  const date = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
 }
 
 function CertificateManager({ userId }: { userId: string }) {
@@ -297,73 +311,72 @@ function CertificateManager({ userId }: { userId: string }) {
   }
 
   const inputClass =
-    "w-full rounded-xl border border-gray-200 bg-white/85 px-4 py-3 text-sm text-[#25364A] placeholder:text-gray-400 outline-none transition-all focus:border-[#0756A5] focus:ring-4 focus:ring-blue-100/70";
+    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-[#0756A5] focus:ring-4 focus:ring-blue-50";
+
+  const labelClass =
+    "mb-2 block text-sm font-semibold text-slate-700";
 
   return (
     <>
       <PageHeader />
 
-      <main className="min-h-screen bg-[#F4F7FB]">
+      <main className="min-h-screen bg-[#F7F9FC]">
         <section className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
+          {/* Page heading */}
           <motion.div
-            initial={{ opacity: 0, y: 18 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={transition}
-            className="glass-strong relative overflow-hidden rounded-[28px] p-6 md:p-8"
+            className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center"
           >
-            <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-blue-200/30 blur-3xl" />
-
-            <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
-              <div>
-                <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-[#0756A5]">
-                  <Award size={15} />
-                  PORTOFOLIO SISWA
-                </div>
-
-                <h1 className="mt-3 text-2xl font-bold tracking-tight text-[#25364A] md:text-3xl">
-                  Sertifikat Saya
-                </h1>
-
-                <p className="mt-2 max-w-lg text-sm leading-6 text-gray-500">
-                  Kelola dan dokumentasikan sertifikat yang pernah kamu
-                  peroleh.
-                </p>
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#0756A5]">
+                <Award size={17} />
+                Portofolio Siswa
               </div>
 
-              <motion.button
-                type="button"
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => {
-                  resetForm();
-                  setShowForm(true);
-                }}
-                className="glass-button inline-flex items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/10 transition-colors hover:bg-blue-800"
-              >
-                <Plus size={18} />
-                Tambah Sertifikat
-              </motion.button>
+              <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+                Sertifikat Saya
+              </h1>
+
+              <p className="mt-2 max-w-lg text-sm leading-6 text-slate-500">
+                Kelola dan dokumentasikan sertifikat yang pernah kamu peroleh.
+              </p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                setShowForm(true);
+              }}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 active:scale-[0.98]"
+            >
+              <Plus size={18} />
+              Tambah Sertifikat
+            </button>
           </motion.div>
 
+          {/* Summary */}
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ ...transition, delay: 0.08 }}
-            className="glass-card mt-6 flex items-center gap-4 rounded-[22px] p-5"
+            transition={{ ...transition, delay: 0.05 }}
+            className="mt-7 flex max-w-xs items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#0756A5]">
-              <Award size={24} />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
+              <Award size={23} />
             </div>
 
             <div>
-              <p className="text-sm text-gray-500">Total Sertifikat</p>
-              <p className="mt-0.5 text-2xl font-bold tabular-nums text-[#25364A]">
+              <p className="text-sm text-slate-500">Total Sertifikat</p>
+              <p className="mt-0.5 text-2xl font-bold tabular-nums text-slate-900">
                 {certificates.length}
               </p>
             </div>
           </motion.div>
 
+          {/* Error message */}
           <AnimatePresence>
             {errorMessage && (
               <motion.div
@@ -371,54 +384,53 @@ function CertificateManager({ userId }: { userId: string }) {
                 animate={{ opacity: 1, height: "auto", y: 0 }}
                 exit={{ opacity: 0, height: 0, y: -8 }}
                 role="alert"
-                className="mt-5 overflow-hidden rounded-2xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm text-red-600"
+                className="mt-5 overflow-hidden rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
               >
                 {errorMessage}
               </motion.div>
             )}
           </AnimatePresence>
 
+          {/* Certificate form */}
           <AnimatePresence>
             {showForm && (
               <motion.section
                 key="certificate-form"
-                initial={{ opacity: 0, y: 18, scale: 0.985 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -12, scale: 0.985 }}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
                 transition={transition}
-                className="glass-strong mt-7 rounded-[26px] p-5 md:p-8"
+                className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-7"
               >
-                <div className="mb-7 flex items-center justify-between gap-4">
+                <div className="mb-6 flex items-start justify-between gap-4 border-b border-slate-100 pb-5">
                   <div>
-                    <p className="text-xs font-semibold tracking-wider text-[#0756A5]">
-                      {editingId ? "PERBARUI DATA" : "SERTIFIKAT BARU"}
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#0756A5]">
+                      {editingId ? "Perbarui Data" : "Sertifikat Baru"}
                     </p>
 
-                    <h2 className="mt-1 text-xl font-bold text-[#25364A]">
+                    <h2 className="mt-1 text-xl font-bold text-slate-900">
                       {editingId ? "Edit Sertifikat" : "Tambah Sertifikat"}
                     </h2>
 
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-slate-500">
                       Lengkapi informasi sertifikat yang ingin ditampilkan.
                     </p>
                   </div>
 
-                  <motion.button
+                  <button
                     type="button"
-                    whileHover={{ rotate: 90 }}
-                    whileTap={{ scale: 0.9 }}
                     onClick={resetForm}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 bg-white/70 text-gray-500 transition-colors hover:bg-white hover:text-gray-800"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
                     aria-label="Tutup formulir"
                   >
-                    <X size={20} />
-                  </motion.button>
+                    <X size={19} />
+                  </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="grid gap-5 md:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#34465B]">
+                      <label className={labelClass}>
                         Nama Sertifikat *
                       </label>
 
@@ -432,7 +444,7 @@ function CertificateManager({ userId }: { userId: string }) {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#34465B]">
+                      <label className={labelClass}>
                         Penerbit / Penyelenggara *
                       </label>
 
@@ -446,7 +458,7 @@ function CertificateManager({ userId }: { userId: string }) {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#34465B]">
+                      <label className={labelClass}>
                         Tanggal Diterbitkan *
                       </label>
 
@@ -460,7 +472,7 @@ function CertificateManager({ userId }: { userId: string }) {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#34465B]">
+                      <label className={labelClass}>
                         Link Sertifikat
                       </label>
 
@@ -477,9 +489,7 @@ function CertificateManager({ userId }: { userId: string }) {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-[#34465B]">
-                      Deskripsi
-                    </label>
+                    <label className={labelClass}>Deskripsi</label>
 
                     <textarea
                       rows={4}
@@ -490,22 +500,23 @@ function CertificateManager({ userId }: { userId: string }) {
                     />
                   </div>
 
+                  {/* Image upload */}
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-[#34465B]">
+                    <label className={labelClass}>
                       Foto Sertifikat
                     </label>
 
-                    <label className="group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-white/55 p-7 text-center transition-all hover:border-[#0756A5] hover:bg-blue-50/60">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#0756A5] transition-transform group-hover:scale-105">
-                        <Upload size={23} />
+                    <label className="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/70 px-5 py-7 text-center transition hover:border-[#0756A5] hover:bg-blue-50/50">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5] transition group-hover:scale-105">
+                        <Upload size={22} />
                       </div>
 
-                      <span className="mt-3 text-sm font-semibold text-gray-700">
+                      <span className="mt-3 text-sm font-semibold text-slate-700">
                         Klik untuk upload foto
                       </span>
 
-                      <span className="mt-1 text-xs text-gray-500">
-                        JPG, PNG, atau WEBP - Maksimal 2 MB
+                      <span className="mt-1 text-xs text-slate-500">
+                        JPG, PNG, atau WEBP · Maksimal 2 MB
                       </span>
 
                       <input
@@ -519,12 +530,26 @@ function CertificateManager({ userId }: { userId: string }) {
                     <AnimatePresence>
                       {certificateImage && (
                         <motion.div
-                          initial={{ opacity: 0, y: 10 }}
+                          initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
+                          exit={{ opacity: 0, y: -8 }}
                           className="mt-4"
                         >
-                          <div className="relative h-56 w-full overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-semibold text-slate-700">
+                              Pratinjau Foto
+                            </p>
+
+                            <button
+                              type="button"
+                              onClick={() => setCertificateImage("")}
+                              className="text-sm font-medium text-red-600 transition hover:text-red-700"
+                            >
+                              Hapus foto
+                            </button>
+                          </div>
+
+                          <div className="mt-3 flex h-56 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={certificateImage}
@@ -532,62 +557,53 @@ function CertificateManager({ userId }: { userId: string }) {
                               className="h-full w-full object-contain"
                             />
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={() => setCertificateImage("")}
-                            className="mt-3 text-sm font-medium text-red-600 transition-colors hover:text-red-700 hover:underline"
-                          >
-                            Hapus foto
-                          </button>
                         </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
 
-                  <div className="flex flex-wrap gap-3 border-t border-gray-200/70 pt-5">
-                    <motion.button
+                  {/* Form actions */}
+                  <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
+                    <button
                       type="submit"
                       disabled={saving}
-                      whileHover={!saving ? { y: -2 } : undefined}
-                      whileTap={!saving ? { scale: 0.97 } : undefined}
-                      className="rounded-xl bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/10 transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0756A5] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {saving
                         ? "Menyimpan..."
                         : editingId
                           ? "Simpan Perubahan"
                           : "Simpan Sertifikat"}
-                    </motion.button>
+                    </button>
 
-                    <motion.button
+                    <button
                       type="button"
                       disabled={saving}
-                      whileHover={!saving ? { y: -2 } : undefined}
-                      whileTap={!saving ? { scale: 0.97 } : undefined}
                       onClick={resetForm}
-                      className="rounded-xl border border-gray-200 bg-white/70 px-6 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-white disabled:opacity-50"
+                      className="min-h-11 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
                     >
                       Batal
-                    </motion.button>
+                    </button>
                   </div>
                 </form>
               </motion.section>
             )}
           </AnimatePresence>
 
+          {/* Certificate list */}
           <section className="mt-9">
             <div className="mb-5">
-              <h2 className="text-lg font-bold text-[#25364A]">
+              <h2 className="text-lg font-bold text-slate-900">
                 Daftar Sertifikat
               </h2>
-              <p className="mt-1 text-sm text-gray-500">
+
+              <p className="mt-1 text-sm text-slate-500">
                 Semua sertifikat yang sudah kamu dokumentasikan.
               </p>
             </div>
 
             {loadingCertificates ? (
-              <div className="glass-strong rounded-[24px] px-6 py-16 text-center">
+              <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{
@@ -597,42 +613,41 @@ function CertificateManager({ userId }: { userId: string }) {
                   }}
                   className="mx-auto h-7 w-7 rounded-full border-2 border-blue-100 border-t-[#0756A5]"
                 />
-                <p className="mt-4 text-sm text-gray-500">
+
+                <p className="mt-4 text-sm text-slate-500">
                   Memuat sertifikat dari Supabase...
                 </p>
               </div>
             ) : certificates.length === 0 ? (
               <motion.div
-                initial={{ opacity: 0, y: 15 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={transition}
-                className="glass-strong rounded-[26px] border border-dashed border-gray-300/80 px-6 py-16 text-center"
+                className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center"
               >
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-[#0756A5]">
-                  <Award size={30} />
+                  <Award size={29} />
                 </div>
 
-                <h3 className="mt-5 font-semibold text-[#25364A]">
+                <h3 className="mt-5 font-semibold text-slate-900">
                   Belum Ada Sertifikat
                 </h3>
 
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-slate-500">
                   Sertifikat yang kamu tambahkan akan muncul di sini.
                 </p>
 
-                <motion.button
+                <button
                   type="button"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.97 }}
                   onClick={() => {
                     resetForm();
                     setShowForm(true);
                   }}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/10 hover:bg-blue-800"
+                  className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0756A5] px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 active:scale-[0.98]"
                 >
                   <Plus size={17} />
                   Tambah Sertifikat Pertama
-                </motion.button>
+                </button>
               </motion.div>
             ) : (
               <motion.div layout className="grid gap-5 md:grid-cols-2">
@@ -646,18 +661,19 @@ function CertificateManager({ userId }: { userId: string }) {
                       <motion.article
                         key={certificate.id}
                         layout
-                        initial={{ opacity: 0, y: 18, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.97 }}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
                         transition={{
                           ...transition,
-                          delay: Math.min(index * 0.045, 0.2),
+                          delay: Math.min(index * 0.04, 0.16),
                         }}
-                        whileHover={{ y: -4 }}
-                        className="glass-card overflow-hidden rounded-[24px]"
+                        whileHover={{ y: -3 }}
+                        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
                       >
+                        {/* Certificate image */}
                         {certificate.imageDataUrl ? (
-                          <div className="relative flex h-52 items-center justify-center overflow-hidden border-b border-gray-200/70 bg-white/70 p-3">
+                          <div className="flex h-52 items-center justify-center overflow-hidden border-b border-slate-100 bg-slate-50 p-3">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={certificate.imageDataUrl}
@@ -666,48 +682,47 @@ function CertificateManager({ userId }: { userId: string }) {
                             />
                           </div>
                         ) : (
-                          <div className="flex h-40 items-center justify-center border-b border-gray-200/70 bg-gradient-to-br from-blue-50 to-white">
-                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white bg-white/80 text-[#0756A5] shadow-sm">
-                              <ImagePlus size={29} />
+                          <div className="flex h-40 items-center justify-center border-b border-slate-100 bg-slate-50">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-[#0756A5] shadow-sm ring-1 ring-slate-200">
+                              <ImagePlus size={27} />
                             </div>
                           </div>
                         )}
 
                         <div className="p-5 md:p-6">
+                          {/* Title and actions */}
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex min-w-0 items-start gap-3">
-                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-[#0756A5]">
-                                <Award size={22} />
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0756A5]">
+                                <Award size={21} />
                               </div>
 
                               <div className="min-w-0">
-                                <h3 className="break-words font-bold text-[#25364A]">
+                                <h3 className="break-words font-bold leading-6 text-slate-900">
                                   {certificate.title}
                                 </h3>
 
-                                <p className="mt-1 break-words text-sm text-gray-500">
+                                <p className="mt-1 break-words text-sm text-slate-500">
                                   {certificate.issuer}
                                 </p>
                               </div>
                             </div>
 
                             <div className="flex shrink-0 items-center gap-1">
-                              <motion.button
+                              <button
                                 type="button"
-                                whileTap={{ scale: 0.9 }}
                                 onClick={() => handleEdit(certificate)}
-                                className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-blue-50 hover:text-[#0756A5]"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-blue-50 hover:text-[#0756A5]"
                                 aria-label="Edit sertifikat"
                               >
                                 <Pencil size={16} />
-                              </motion.button>
+                              </button>
 
-                              <motion.button
+                              <button
                                 type="button"
                                 disabled={deletingId === certificate.id}
-                                whileTap={{ scale: 0.9 }}
                                 onClick={() => handleDelete(certificate.id)}
-                                className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                                 aria-label="Hapus sertifikat"
                               >
                                 {deletingId === certificate.id ? (
@@ -715,33 +730,41 @@ function CertificateManager({ userId }: { userId: string }) {
                                 ) : (
                                   <Trash2 size={16} />
                                 )}
-                              </motion.button>
+                              </button>
                             </div>
                           </div>
 
-                          <div className="mt-5 flex items-center gap-2 text-sm text-gray-500">
-                            <CalendarDays size={15} className="text-[#0756A5]" />
-                            {certificate.issueDate}
+                          {/* Issue date */}
+                          <div className="mt-5 flex items-center gap-2 text-sm text-slate-500">
+                            <CalendarDays
+                              size={15}
+                              className="shrink-0 text-[#0756A5]"
+                            />
+                            <span>
+                              Diterbitkan {formatIssueDate(certificate.issueDate)}
+                            </span>
                           </div>
 
+                          {/* Description */}
                           {certificate.description && (
-                            <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600">
+                            <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">
                               {certificate.description}
                             </p>
                           )}
 
+                          {/* Credential link */}
                           {safeCredentialUrl ? (
                             <a
                               href={safeCredentialUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="mt-5 inline-flex items-center gap-2 border-t border-gray-200/70 pt-4 text-sm font-semibold text-[#0756A5] transition-colors hover:text-blue-800"
+                              className="mt-5 inline-flex items-center gap-2 border-t border-slate-100 pt-4 text-sm font-semibold text-[#0756A5] transition hover:text-blue-800"
                             >
                               Lihat Sertifikat
                               <ExternalLink size={15} />
                             </a>
                           ) : certificate.credentialUrl ? (
-                            <p className="mt-5 border-t border-gray-200/70 pt-4 text-xs text-red-500">
+                            <p className="mt-5 border-t border-slate-100 pt-4 text-xs text-red-500">
                               Link sertifikat tidak valid
                             </p>
                           ) : null}
@@ -771,7 +794,7 @@ export default function CertificatesPage() {
 
   if (loading || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F9FC]">
         <div className="text-center">
           <motion.div
             animate={{ rotate: 360 }}
@@ -782,7 +805,10 @@ export default function CertificatesPage() {
             }}
             className="mx-auto h-7 w-7 rounded-full border-2 border-blue-100 border-t-[#0756A5]"
           />
-          <p className="mt-4 text-sm text-gray-500">Memuat sertifikat...</p>
+
+          <p className="mt-4 text-sm text-slate-500">
+            Memuat sertifikat...
+          </p>
         </div>
       </main>
     );
